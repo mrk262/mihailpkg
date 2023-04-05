@@ -138,9 +138,9 @@ def main():
 
                         fig_list.append(fig)
                         axes_list.append(ax)
-                        secm_window = SecmWindow(root,fig)
-                        secm_window.resizable(False,False)
-                        secm_window.title('fig ' + str(fig.number - 1))
+                        img_window = ImageWindow(root,fig)
+                        img_window.resizable(False,False)
+                        img_window.title('fig ' + str(fig.number - 1))
 
                     else:
 
@@ -1009,6 +1009,19 @@ def main():
 
 
 #%%--------------------------------build the line plot window------------------
+
+    class ImageWindow(tk.Toplevel):
+        def __init__(self, parent, fig, *args, **kwargs):
+            tk.Toplevel.__init__(self, parent, *args, **kwargs)
+
+            self.fig = fig
+            self.ax = fig.axes[0]
+
+            self.canvas = FigureCanvasTkAgg(fig, master=self)  # A tk.DrawingArea.
+            self.canvas.draw()
+            self.canvas.get_tk_widget().pack(fill='both',expand=True)
+
+
 
     class LinePlotWindow(tk.Toplevel):
         class AppRclickMenu(tk.Menu):
