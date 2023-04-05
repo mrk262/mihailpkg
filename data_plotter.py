@@ -587,7 +587,7 @@ def main():
         text_entry.grid(row=1, column=0, columnspan=2, pady=5)
 
         tk.Button(win, text="Ok", command=get_text, padx=2, pady=2).grid(row=2, column=0, columnspan=1, sticky='nesw', padx=5, pady=5)
-        tk.Button(win, text="Close", command=win.destroy, padx=2, pady=2).grid(row=2, column=0, columnspan=1, sticky='nesw', padx=5, pady=5)
+        tk.Button(win, text="Close", command=win.destroy, padx=2, pady=2).grid(row=2, column=1, columnspan=1, sticky='nesw', padx=5, pady=5)
 
 
     def save_data(ax):
