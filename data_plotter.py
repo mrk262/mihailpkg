@@ -9,6 +9,8 @@ Created on Sun Apr 11 19:27:44 2021
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
+from matplotlib import image as mpimg
+from PIL import Image
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.simpledialog as sd
@@ -113,9 +115,9 @@ def main():
         main_app_files.listboxContainer.update_idletasks()
         main_app_files.listboxContainer.configure(scrollregion= main_app_files.listboxContainer.bbox('all'))
 
-    def plot_curve(ax = None):
+    def plot_curve(ax = None, image=False):
         """Plot the user selected data files and load data into the dict."""
-        if main_app_controls.overlay.get() and ax==None:                                                           #check if we want to overlay the selected data or plot it in a new graph
+        if main_app_controls.overlay.get() and ax==None and image == False:                                                           #check if we want to overlay the selected data or plot it in a new graph
             fig,ax = plt.subplots()
             fig_list.append(fig)
             axes_list.append(ax)
@@ -128,30 +130,44 @@ def main():
 
                 if data_num in Listbox_reference.curselection():                    #only plot user selected data
 
-                    if not main_app_controls.overlay.get() and ax == None:                                           #if not overlaying data, make a new figure for each data file
-                        fig,ax = plt.subplots()
+                    if image:
+                        img = mpimg.imread(full_filenames_list[k])
+                        fig, ax = plt.subplots()
+                        ax.axis('off')
+                        image = fig.figimage(img, resize=True)
+
                         fig_list.append(fig)
                         axes_list.append(ax)
-                        line_plot_window = LinePlotWindow(root,fig)
-                        line_plot_window.title('fig ' + str(fig.number - 1))
+                        secm_window = SecmWindow(root,fig)
+                        secm_window.resizable(False,False)
+                        secm_window.title('fig ' + str(fig.number - 1))
+
+                    else:
+
+                        if not main_app_controls.overlay.get() and ax == None:                                           #if not overlaying data, make a new figure for each data file
+                            fig,ax = plt.subplots()
+                            fig_list.append(fig)
+                            axes_list.append(ax)
+                            line_plot_window = LinePlotWindow(root,fig)
+                            line_plot_window.title('fig ' + str(fig.number - 1))
 
 
-                    x=int(main_app_controls.columns_to_plot.get().split(',')[0])                      #user selected data columns to plot based on their index
-                    y=int(main_app_controls.columns_to_plot.get().split(',')[1])
+                        x=int(main_app_controls.columns_to_plot.get().split(',')[0])                      #user selected data columns to plot based on their index
+                        y=int(main_app_controls.columns_to_plot.get().split(',')[1])
 
-                    data_array = parse_file(filenames[k],full_filenames_list[k])
-                    ax.plot(data_array[:,x],
-                            data_array[:,y],
-                            label = filenames[k])
-                    ax.legend()
-                    L = ax.get_legend()
-                    L.set_draggable(True)
-                    try:
-                        format_data_labels(filenames[k])
-                        ax.set_xlabel(label[filenames[k]][x])
-                        ax.set_ylabel(label[filenames[k]][y])
-                    except:
-                        pass
+                        data_array = parse_file(filenames[k],full_filenames_list[k])
+                        ax.plot(data_array[:,x],
+                                data_array[:,y],
+                                label = filenames[k])
+                        ax.legend()
+                        L = ax.get_legend()
+                        L.set_draggable(True)
+                        try:
+                            format_data_labels(filenames[k])
+                            ax.set_xlabel(label[filenames[k]][x])
+                            ax.set_ylabel(label[filenames[k]][y])
+                        except:
+                            pass
         ax.get_figure().canvas.draw()
         ax.get_figure().canvas.flush_events()
         deselect()
@@ -920,7 +936,7 @@ def main():
             self.plot2D_Button = tk.Button(self,text='Plot SECM',command = plot_2Dmap, width=MAIN_WIDTH)
             self.plot2D_Button.grid(row = 3, column = 1,columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
-            self.toggleLegend_Button = tk.Button(self,text='Remove', command = self.main_app_menubar.remove_files)
+            self.toggleLegend_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image=True))
             self.toggleLegend_Button.grid(row = 4, column = 0, columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
             self.code_Button = tk.Button(self,text='Code',command = code_input, width=MAIN_WIDTH)
