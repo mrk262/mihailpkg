@@ -1011,6 +1011,15 @@ def main():
 #%%--------------------------------build the line plot window------------------
 
     class ImageWindow(tk.Toplevel):
+        class AppRclickMenu(tk.Menu):
+            def __init__(self, parent, ax, *args, **kwargs):
+                tk.Menu.__init__(self, parent, *args, **kwargs)
+                self.parent = parent
+
+                self.add_command(
+                    label = 'close',
+                    command = self.parent.destroy)
+
         def __init__(self, parent, fig, *args, **kwargs):
             tk.Toplevel.__init__(self, parent, *args, **kwargs)
 
@@ -1020,6 +1029,17 @@ def main():
             self.canvas = FigureCanvasTkAgg(fig, master=self)  # A tk.DrawingArea.
             self.canvas.draw()
             self.canvas.get_tk_widget().pack(fill='both',expand=True)
+            self.canvas.get_tk_widget().bind('<Button-3>', lambda x: self.popup_menu(event=x))
+
+            self.app_rclick_menu = ImageWindow.AppRclickMenu(self,self.ax)
+
+        def popup_menu(self, event = None):
+            try:
+                self.app_rclick_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                self.app_rclick_menu.grab_release()
+
+
 
 
 
