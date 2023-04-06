@@ -7,6 +7,7 @@ Created on Sun Apr 11 19:27:44 2021
 
 
 import numpy as np
+from math import ceil
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from matplotlib import image as mpimg
@@ -20,6 +21,8 @@ import os
 import threading
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
+import matplotlib.transforms as mtransforms
+
 
 warnings.filterwarnings("ignore", message="This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.")
 # warnings.filterwarnings("ignore", message="Starting a Matplotlib GUI outside of the main thread will likely fail.")
@@ -115,9 +118,9 @@ def main():
         main_app_files.listboxContainer.update_idletasks()
         main_app_files.listboxContainer.configure(scrollregion= main_app_files.listboxContainer.bbox('all'))
 
-    def plot_curve(ax = None, image=False):
+    def plot_curve(ax = None, image_file=False):
         """Plot the user selected data files and load data into the dict."""
-        if main_app_controls.overlay.get() and ax==None and image == False:                                                           #check if we want to overlay the selected data or plot it in a new graph
+        if main_app_controls.overlay.get() and ax==None and image_file == False:                                                           #check if we want to overlay the selected data or plot it in a new graph
             fig,ax = plt.subplots()
             fig_list.append(fig)
             axes_list.append(ax)
@@ -130,17 +133,23 @@ def main():
 
                 if data_num in Listbox_reference.curselection():                    #only plot user selected data
 
-                    if image:
+                    if image_file:
                         img = mpimg.imread(full_filenames_list[k])
                         fig, ax = plt.subplots()
                         ax.axis('off')
-                        image = fig.figimage(img, resize=True)
+                        figImage = fig.figimage(img, resize=True)
 
                         fig_list.append(fig)
                         axes_list.append(ax)
                         img_window = ImageWindow(root,fig)
+
+                        display_width, display_height = img.shape[1],img.shape[0]
                         img_window.resizable(False,False)
-                        img_window.title('fig ' + str(fig.number - 1))
+                        img_window.geometry("{}x{}".format(display_width, display_height))
+                        img_window.title('fig ' + str(fig.number - 1) + "\t{}x{}".format(display_width, display_height))
+                        img_window.original_image = img
+                        img_window.figImage = figImage
+                        data[filenames[k]] = img
 
                     else:
 
@@ -170,8 +179,6 @@ def main():
                             pass
         ax.get_figure().canvas.draw()
         ax.get_figure().canvas.flush_events()
-        deselect()
-
 
 
     def plot_2Dmap():
@@ -243,9 +250,6 @@ def main():
 
                     data[filenames[k]] = (X,Y,Z * iss)
                     SECM_plot_ref_list.append((fig,ax,secm_window.image,secm_window.colorbar))
-
-
-        deselect()
 
 
     def parse_file(filename,full_filename):
@@ -338,10 +342,6 @@ def main():
                     continue
                 fig_list[i].canvas.draw()                                   #update the change on the figure
 
-    def deselect():
-        """Deselect all active lines in all listboxes."""
-        for Listbox_reference in Listbox_list:
-            Listbox_reference.selection_clear(0,'end')
 
     def print_labels(event = None):
         """Print all the column labels of double-clicked file and plot only specified columns."""
@@ -691,6 +691,8 @@ def main():
         # Button functions
 
         def run():
+            i = float(text_editor.index(tk.INSERT))
+            text_editor.delete("insert-1c")
             text = text_editor.get(1.0, tk.END)
             namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np}
             exec(text, namespace)
@@ -832,6 +834,7 @@ def main():
                     if new_filename == None: return
                     l.delete(i)
                     l.insert(i, new_filename)
+
                     for m,file in enumerate(full_filenames_list):
                         file_structure = file.split('/')
                         if (selected_filename.strip('$') == file_structure[-1][:-4]) and (
@@ -842,7 +845,7 @@ def main():
                                 directory += folder + '/'
                             os.rename(file, directory + new_filename + file[-4:])
                             full_filenames_list[m] = directory + new_filename + file[-4:]
-
+                            filenames[m] = new_filename
 
         def remove_files(self):
             def delete_files():
@@ -936,7 +939,7 @@ def main():
             self.plot2D_Button = tk.Button(self,text='Plot SECM',command = plot_2Dmap, width=MAIN_WIDTH)
             self.plot2D_Button.grid(row = 3, column = 1,columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
-            self.toggleLegend_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image=True))
+            self.toggleLegend_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image_file=True))
             self.toggleLegend_Button.grid(row = 4, column = 0, columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
             self.code_Button = tk.Button(self,text='Code',command = code_input, width=MAIN_WIDTH)
@@ -1030,6 +1033,12 @@ def main():
             self.canvas.draw()
             self.canvas.get_tk_widget().pack(fill='both',expand=True)
             self.canvas.get_tk_widget().bind('<Button-3>', lambda x: self.popup_menu(event=x))
+            self.canvas.get_tk_widget().bind('<Right>', lambda x: self.open_next_previous(event=x))
+            self.canvas.get_tk_widget().bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
+            self.canvas.get_tk_widget().bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
+            self.canvas.get_tk_widget().bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
+            self.magnification = 1
+
 
             self.app_rclick_menu = ImageWindow.AppRclickMenu(self,self.ax)
 
@@ -1039,8 +1048,62 @@ def main():
             finally:
                 self.app_rclick_menu.grab_release()
 
+        def open_next_previous(self, event = None, previous = False):
+            #ensure only a single file is selected
+            number_of_selected_files = 0
+
+            for Listbox in Listbox_list:
+                for i in Listbox.curselection():
+                    number_of_selected_files += 1
+            if number_of_selected_files > 1:
+                print("{} files selected.\nPlease select only one, dumb bitch".format(number_of_selected_files))
+                return
+
+            #move selection up by 1
+            Listbox.selection_clear(i)
+            if previous == False:
+                i += 1
+                if i == Listbox.size(): i = 0
+                filename = Listbox.get(i)
+                Listbox.selection_set(i)
+            else:
+                Listbox.selection_clear(i)
+                i -= 1
+                if i < 0: i = Listbox.size() - 1
+                filename = Listbox.get(i)
+                Listbox.selection_set(i)
+
+            img = mpimg.imread(full_filenames_list[filenames.index(filename)])
+
+            self.figImage.set_data(img)
+            self.original_image = img
+            if hasattr(self,'transform'):
+                display_width, display_height = self.transform.transform((self.original_image.shape[1],self.original_image.shape[0]))
+            else:
+                display_width, display_height = self.original_image.shape[1],self.original_image.shape[0]
+            self.geometry("{}x{}".format(ceil(display_width), ceil(display_height)))
+            self.title('fig ' + str(self.fig.number - 1) + "\t{}x{}".format(ceil(display_width), ceil(display_height)))
+
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+
+        def scale(self, event = None, magnification = 1):
+
+            self.magnification *= magnification
+            if self.magnification > 1:
+                self.magnification = 1
+                return
 
 
+            self.transform = mtransforms.Affine2D().scale(self.magnification, self.magnification)
+            display_width, display_height = self.transform.transform((self.original_image.shape[1],self.original_image.shape[0]))
+            self.geometry("{}x{}".format(ceil(display_width), ceil(display_height)))
+
+            self.figImage.set_transform(self.transform)
+
+            self.title('fig ' + str(self.fig.number - 1) + "\t{}x{}".format(ceil(display_width), ceil(display_height)))
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
 
 
     class LinePlotWindow(tk.Toplevel):
