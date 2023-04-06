@@ -898,6 +898,13 @@ def main():
             add_desc('l', 'Legend on')
             add_desc('Shift + l', 'Legend off')
             add_desc('Ctrl + c', 'Copy filenames')
+            add_desc('Up', 'Upscale image')
+            add_desc('Down', 'Downscale image')
+            add_desc('Right', 'Next image')
+            add_desc('Left', 'Previous image')
+            add_desc('m', 'Measure image')
+
+
             #add_desc('r', 'Refresh plot')
 
 
@@ -1028,6 +1035,7 @@ def main():
 
             self.fig = fig
             self.ax = fig.axes[0]
+            self.magnification = 1
 
             self.canvas = FigureCanvasTkAgg(fig, master=self)  # A tk.DrawingArea.
             self.canvas.draw()
@@ -1037,7 +1045,9 @@ def main():
             self.canvas.get_tk_widget().bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
             self.canvas.get_tk_widget().bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
             self.canvas.get_tk_widget().bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
-            self.magnification = 1
+            self.canvas.get_tk_widget().bind('<m>', lambda x: self.measure(event=x))
+
+
 
 
             self.app_rclick_menu = ImageWindow.AppRclickMenu(self,self.ax)
@@ -1104,6 +1114,52 @@ def main():
             self.title('fig ' + str(self.fig.number - 1) + "\t{}x{}".format(ceil(display_width), ceil(display_height)))
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
+
+        def measure(self, event=None):
+            WIDTH = 10
+            def return_pointer_coord(event=None):
+                x, y = event.x, event.y
+                if not pt1.active:
+                    pt1.active = True
+                    pt1.config(text='{}, {}'.format(x, y))
+                    pt2.config(text='')
+                    dist.config(text='')
+                    pt1.x, pt1.y = x, y
+                    return
+
+                if pt1.active:
+                    pt1.active = False
+                    pt2.config(text='{}, {}'.format(x, y))
+                    pt2.x, pt2.y = x, y
+                    distance = ((pt1.x - pt2.x)**2 + (pt1.y - pt2.y)**2)**0.5
+                    dist.config(text='{:.1f} px'.format(distance),fg='red')
+                    return
+
+
+            def close_window():
+                self.canvas.get_tk_widget().unbind('<Button-1>')
+                win.destroy()
+
+            win = tk.Toplevel(root)
+            win.resizable(False,False)
+            tk.Label(win, text='pt1:', width=WIDTH).grid(row=0, column=0)
+            pt1 = tk.Label(win, text='', width=WIDTH)
+            pt1.active = False
+            pt1.grid(row=0, column=1)
+            tk.Label(win, text='pt2:', width=WIDTH).grid(row=1, column=0)
+            pt2 = tk.Label(win, text='', width=WIDTH)
+            pt2.grid(row=1, column=1)
+            tk.Label(win, text='dist:', width=WIDTH).grid(row=2, column=0)
+            dist = tk.Label(win, text='', width=WIDTH)
+            dist.grid(row=2, column=1)
+
+            close_button = tk.Button(win, text='Close', command=close_window, width=WIDTH)
+            close_button.grid(row=3, column=0, columnspan=2)
+            self.canvas.get_tk_widget().bind('<Button-1>', lambda x: return_pointer_coord(event=x))
+
+
+
+
 
 
     class LinePlotWindow(tk.Toplevel):
