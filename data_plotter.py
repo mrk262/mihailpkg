@@ -11,7 +11,7 @@ from math import ceil
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from matplotlib import image as mpimg
-from PIL import Image
+from PIL import Image, ImageDraw, ImageTk
 import tkinter as tk
 import tkinter.filedialog as fd
 import tkinter.simpledialog as sd
@@ -134,22 +134,10 @@ def main():
                 if data_num in Listbox_reference.curselection():                    #only plot user selected data
 
                     if image_file:
-                        img = mpimg.imread(full_filenames_list[k])
-                        fig, ax = plt.subplots()
-                        ax.axis('off')
-                        figImage = fig.figimage(img, resize=True)
 
-                        fig_list.append(fig)
-                        axes_list.append(ax)
-                        img_window = ImageWindow(root,fig)
-
-                        display_width, display_height = img.shape[1],img.shape[0]
-                        img_window.resizable(False,False)
-                        img_window.geometry("{}x{}".format(display_width, display_height))
-                        img_window.title('fig ' + str(fig.number - 1) + "\t{}x{}".format(display_width, display_height))
-                        img_window.original_image = img
-                        img_window.figImage = figImage
-                        data[filenames[k]] = img
+                        image = Image.open(full_filenames_list[k])
+                        img_window = ImageWindow(root,image, filename=filenames[k])
+                        data[filenames[k]] = image
 
                     else:
 
@@ -177,8 +165,8 @@ def main():
                             ax.set_ylabel(label[filenames[k]][y])
                         except:
                             pass
-        ax.get_figure().canvas.draw()
-        ax.get_figure().canvas.flush_events()
+                        ax.get_figure().canvas.draw()
+                        ax.get_figure().canvas.flush_events()
 
 
     def plot_2Dmap():
@@ -564,7 +552,7 @@ def main():
 
         tk.Button(win, text='Close', command=win.destroy).pack()
 
-    def add_text(ax):
+    def add_text(ax, event=None):
 
         def get_text():
             ax.user_text = text_entry.get()
@@ -903,6 +891,7 @@ def main():
             add_desc('Right', 'Next image')
             add_desc('Left', 'Previous image')
             add_desc('m', 'Measure image')
+            add_desc('t', 'Add text')
 
 
             #add_desc('r', 'Refresh plot')
@@ -1006,6 +995,7 @@ def main():
             self.canvas.draw()
             self.canvas.get_tk_widget().pack(side="bottom", fill='both',expand=True)
             self.canvas.get_tk_widget().bind('<Button-3>', lambda x: self.popup_menu(event=x))
+            self.canvas.get_tk_widget().bind('t', lambda x: add_text(self.ax, event=x))
 
             self.toolbarFrame = tk.Frame(master=self)
             self.toolbarFrame.pack(side="top",fill='x',expand=False)
@@ -1022,35 +1012,51 @@ def main():
 
     class ImageWindow(tk.Toplevel):
         class AppRclickMenu(tk.Menu):
-            def __init__(self, parent, ax, *args, **kwargs):
+            def __init__(self, parent, *args, **kwargs):
                 tk.Menu.__init__(self, parent, *args, **kwargs)
                 self.parent = parent
+
+                self.add_command(
+                    label = 'measure',
+                    command = self.parent.measure)
+
+                self.add_command(
+                    label = 'add text',
+                    command = self.parent.text)
 
                 self.add_command(
                     label = 'close',
                     command = self.parent.destroy)
 
-        def __init__(self, parent, fig, *args, **kwargs):
+        def __init__(self, parent, image, filename='', *args, **kwargs):
             tk.Toplevel.__init__(self, parent, *args, **kwargs)
+            self.filename = filename
+            self.image = image
+            self.original_image = self.image.copy()
+            self.tkimage = ImageTk.PhotoImage(self.original_image)
 
-            self.fig = fig
-            self.ax = fig.axes[0]
+            self.resizable(False,False)
+            self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
+            self.title("{}x{}\t".format(self.tkimage.width(), self.tkimage.height()) + self.filename)
+
+            self.canvas = tk.Canvas(self, width=self.tkimage.width(), height=self.tkimage.height())
+            self.container = self.canvas.create_image(0, 0, anchor='nw', image=self.tkimage)
+            self.canvas.pack()
+
             self.magnification = 1
 
-            self.canvas = FigureCanvasTkAgg(fig, master=self)  # A tk.DrawingArea.
-            self.canvas.draw()
-            self.canvas.get_tk_widget().pack(fill='both',expand=True)
-            self.canvas.get_tk_widget().bind('<Button-3>', lambda x: self.popup_menu(event=x))
-            self.canvas.get_tk_widget().bind('<Right>', lambda x: self.open_next_previous(event=x))
-            self.canvas.get_tk_widget().bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
-            self.canvas.get_tk_widget().bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
-            self.canvas.get_tk_widget().bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
-            self.canvas.get_tk_widget().bind('<m>', lambda x: self.measure(event=x))
+            self.bind('<Button-3>', lambda x: self.popup_menu(event=x))
+            self.bind('<Right>', lambda x: self.open_next_previous(event=x))
+            self.bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
+            self.bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
+            self.bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
+            self.bind('<m>', lambda x: self.measure(event=x))
+            self.bind('<Control-s>', lambda x: self.save(event=x))
+            self.bind('<t>', lambda x: self.text(event=x))
 
 
 
-
-            self.app_rclick_menu = ImageWindow.AppRclickMenu(self,self.ax)
+            self.app_rclick_menu = ImageWindow.AppRclickMenu(self)
 
         def popup_menu(self, event = None):
             try:
@@ -1058,13 +1064,25 @@ def main():
             finally:
                 self.app_rclick_menu.grab_release()
 
+        def update_image(self):
+
+            self.tkimage = ImageTk.PhotoImage(self.image)
+            self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
+            self.canvas.itemconfig(self.container, image=self.tkimage)
+            self.canvas.config(width=self.tkimage.width(), height=self.tkimage.height())
+
+        def save(self, event=None):
+            filename = fd.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
+            self.image.save(filename)
+
         def open_next_previous(self, event = None, previous = False):
             #ensure only a single file is selected
             number_of_selected_files = 0
 
-            for Listbox in Listbox_list:
-                for i in Listbox.curselection():
+            for Listbox_ in Listbox_list:
+                for i in Listbox_.curselection():
                     number_of_selected_files += 1
+                    Listbox = Listbox_
             if number_of_selected_files > 1:
                 print("{} files selected.\nPlease select only one, dumb bitch".format(number_of_selected_files))
                 return
@@ -1083,37 +1101,35 @@ def main():
                 filename = Listbox.get(i)
                 Listbox.selection_set(i)
 
-            img = mpimg.imread(full_filenames_list[filenames.index(filename)])
+            self.original_image = Image.open(full_filenames_list[filenames.index(filename)])
+            self.image = self.original_image.copy()
+            self.filename = filename
 
-            self.figImage.set_data(img)
-            self.original_image = img
-            if hasattr(self,'transform'):
-                display_width, display_height = self.transform.transform((self.original_image.shape[1],self.original_image.shape[0]))
+            if not (0.99 < self.magnification < 1.01):
+                w, h = self.original_image.width, self.original_image.height
+                self.image = self.original_image.resize((round(w*self.magnification), round(h*self.magnification)))
+                self.title("{}x{} {:.0f}%\t".format(self.tkimage.width(), self.tkimage.height(), self.magnification*100) + self.filename)
             else:
-                display_width, display_height = self.original_image.shape[1],self.original_image.shape[0]
-            self.geometry("{}x{}".format(ceil(display_width), ceil(display_height)))
-            self.title('fig ' + str(self.fig.number - 1) + "\t{}x{}".format(ceil(display_width), ceil(display_height)))
+                self.title("{}x{}\t".format(self.tkimage.width(), self.tkimage.height()) + self.filename)
 
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
+            self.update_image()
+            data[filename] = self.original_image
 
         def scale(self, event = None, magnification = 1):
 
             self.magnification *= magnification
-            if self.magnification > 1:
-                self.magnification = 1
-                return
+            w, h = self.original_image.width, self.original_image.height
 
+            if 0.99 < self.magnification < 1.01:
+                self.image = self.original_image.copy()
+                self.title("{}x{}\t".format(self.tkimage.width(), self.tkimage.height()) + self.filename)
 
-            self.transform = mtransforms.Affine2D().scale(self.magnification, self.magnification)
-            display_width, display_height = self.transform.transform((self.original_image.shape[1],self.original_image.shape[0]))
-            self.geometry("{}x{}".format(ceil(display_width), ceil(display_height)))
+            else:
+                self.image = self.original_image.resize((round(w*self.magnification), round(h*self.magnification)))
+                self.title("{}x{} {:.0f}%\t".format(self.tkimage.width(), self.tkimage.height(), self.magnification*100) + self.filename)
 
-            self.figImage.set_transform(self.transform)
-
-            self.title('fig ' + str(self.fig.number - 1) + "\t{}x{}".format(ceil(display_width), ceil(display_height)))
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
+            self.tkimage = ImageTk.PhotoImage(self.image)
+            self.update_image()
 
         def measure(self, event=None):
             WIDTH = 10
@@ -1133,11 +1149,17 @@ def main():
                     pt2.x, pt2.y = x, y
                     distance = ((pt1.x - pt2.x)**2 + (pt1.y - pt2.y)**2)**0.5
                     dist.config(text='{:.1f} px'.format(distance),fg='red')
+                    xy = [(pt1.x, pt1.y),(pt2.x, pt2.y)]
+                    draw = ImageDraw.Draw(self.image)
+                    draw.line(xy, fill='red')
+                    self.update_image()
+
                     return
 
-
             def close_window():
-                self.canvas.get_tk_widget().unbind('<Button-1>')
+                self.canvas.unbind('<Button-1>')
+                self.image = self.original_image.copy()
+                self.update_image()
                 win.destroy()
 
             win = tk.Toplevel(root)
@@ -1153,13 +1175,41 @@ def main():
             dist = tk.Label(win, text='', width=WIDTH)
             dist.grid(row=2, column=1)
 
+            save_button = tk.Button(win, text='Save', command=self.save, width=WIDTH)
+            save_button.grid(row=3, column=0, columnspan=1)
             close_button = tk.Button(win, text='Close', command=close_window, width=WIDTH)
-            close_button.grid(row=3, column=0, columnspan=2)
-            self.canvas.get_tk_widget().bind('<Button-1>', lambda x: return_pointer_coord(event=x))
+            close_button.grid(row=3, column=1, columnspan=1)
+            self.canvas.bind('<Button-1>', lambda x: return_pointer_coord(event=x))
+
+        def text(self, event=None):
+            WIDTH = 20
+            def return_pointer_coord(event=None):
+                x, y = event.x, event.y
+
+                draw = ImageDraw.Draw(self.image)
+                draw.text((x,y), textEntry.get(), fill='red')
+                self.update_image()
+
+            def close_window():
+                self.canvas.unbind('<Button-1>')
+                self.image = self.original_image.copy()
+                self.update_image()
+                win.destroy()
+
+            win = tk.Toplevel(root)
+            win.resizable(False,False)
+
+            tk.Label(win, text='Text to insert', width=WIDTH).grid(row=0, column=0, columnspan=2)
+            textEntry = tk.Entry(win, text='', width=WIDTH)
+            textEntry.grid(row=1, column=0, columnspan=2, pady=10)
 
 
 
-
+            save_button = tk.Button(win, text='Save', command=self.save, width=10)
+            save_button.grid(row=3, column=0, columnspan=1)
+            close_button = tk.Button(win, text='Close', command=close_window, width=10)
+            close_button.grid(row=3, column=1, columnspan=1)
+            self.canvas.bind('<Button-1>', lambda x: return_pointer_coord(event=x))
 
 
     class LinePlotWindow(tk.Toplevel):
@@ -1203,6 +1253,7 @@ def main():
             self.canvas.get_tk_widget().bind('l', lambda x: legend_ON(ax = self.ax, event=x))
             self.canvas.get_tk_widget().bind('<Shift-L>', lambda x: legend_OFF(ax = self.ax, event=x))
             self.canvas.get_tk_widget().bind('r', self.refresh)
+            self.canvas.get_tk_widget().bind('t', lambda x: add_text(self.ax, event=x))
 
 
             self.toolbarFrame = tk.Frame(master=self)
