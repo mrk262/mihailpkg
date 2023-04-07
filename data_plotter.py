@@ -1106,7 +1106,6 @@ def main():
                 self.app_rclick_menu.grab_release()
 
         def update_image(self):
-
             self.tkimage = ImageTk.PhotoImage(self.image)
             self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
             self.canvas.itemconfig(self.container, image=self.tkimage)
@@ -1192,10 +1191,12 @@ def main():
                     dist.config(text='{:.0f} px'.format(distance),fg='red')
                     xy = [(pt1.x, pt1.y),(pt2.x, pt2.y)]
                     try:
+                        self.previous_image = self.image.copy()
                         draw = ImageDraw.Draw(self.image)
                         draw.line(xy, fill='red')
                     except:
                         self.image = self.image.convert(mode='RGBA')
+                        self.previous_image = self.image.copy()
                         draw = ImageDraw.Draw(self.image)
                         draw.line(xy, fill='red')
                     self.update_image()
@@ -1225,11 +1226,16 @@ def main():
                     self.canvas.unbind('<Button-1>')
                     measure_button.config(text='Measure Off')
                     return
+            def undo(event=None):
+                self.image = self.previous_image
+                self.update_image()
 
             win = tk.Toplevel(root)
             win.protocol('WM_DELETE_WINDOW', close_window)
             win.resizable(False,False)
 
+            self.bind('<Control-z>', undo)
+            self.unbind('<Right>')
             self.unbind('<Right>')
             self.unbind('<Left>')
             self.unbind('<Up>')
@@ -1258,10 +1264,12 @@ def main():
             def return_pointer_coord(event=None):
                 x, y = event.x, event.y
                 try:
+                    self.previous_image = self.image.copy()
                     draw = ImageDraw.Draw(self.image)
                     draw.text((x,y), textEntry.get(), fill='red')
                 except:
                     self.image = self.image.convert(mode='RGBA')
+                    self.previous_image = self.image.copy()
                     draw = ImageDraw.Draw(self.image)
                     draw.text((x,y), textEntry.get(), fill='red')
 
@@ -1289,10 +1297,15 @@ def main():
                     text_button.config(text='Text Off')
                     return
 
+            def undo(event=None):
+                self.image = self.previous_image
+                self.update_image()
+
             win = tk.Toplevel(root)
             win.protocol('WM_DELETE_WINDOW', close_window)
             win.resizable(False,False)
 
+            self.bind('<Control-z>', undo)
             self.unbind('<Right>')
             self.unbind('<Left>')
             self.unbind('<Up>')
