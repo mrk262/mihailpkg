@@ -11,8 +11,12 @@ import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from PIL import Image, ImageDraw, ImageTk
 import tkinter as tk
+from tkinter import scrolledtext
+from tkinter import filedialog
+from tkinter import simpledialog
 import warnings
 import os
+import sys, traceback
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
 
@@ -65,7 +69,7 @@ def main():
 
     def selectfiles():
         """Allow user to select data files from a directory, then display filenames for interactive plotting."""
-        filenameslist = tk.filedialog.askopenfilenames(filetypes = [('All files','*.*'),
+        filenameslist = filedialog.askopenfilenames(filetypes = [('All files','*.*'),
                                                       ('Text files','*.txt'),
                                                       ('CSV files','*.csv'),
                                                       ('FuelCell3 files','*.fcd'),
@@ -163,7 +167,7 @@ def main():
 
     def plot_2Dmap():
         """Plot a heat map from a 3 column Array of x,y,z data points."""
-        string = tk.simpledialog.askstring('title','input bulk steady state curent(s) (comma separated) for normalization\n')
+        string = simpledialog.askstring('title','input bulk steady state curent(s) (comma separated) for normalization\n')
         iss_list = string.split(',')
         k = -1                                                                      #tracks the index of file in file_names
         n= -1                                                                       #tracks number of plots made
@@ -581,7 +585,7 @@ def main():
 
         def save2():
             win.destroy()
-            file = tk.filedialog.asksaveasfile(filetypes = [('Multi line graph', '*.mlg'), ('All Files', '*.*')], defaultextension = [('Multi line graph', '*.mlg'), ('All Files', '*.*')])
+            file = filedialog.asksaveasfile(filetypes = [('Multi line graph', '*.mlg'), ('All Files', '*.*')], defaultextension = [('Multi line graph', '*.mlg'), ('All Files', '*.*')])
             x_label = ax.get_xlabel()
             y_label = ax.get_ylabel()
             file.write(x_label + '\t' + y_label + '\n')
@@ -665,36 +669,89 @@ def main():
 
             def save_data(self):
                 import pickle
-                file = tk.filedialog.asksaveasfile(mode = 'wb', filetypes = [('Pickled Files', '*.pickle')], defaultextension = [('Pickled Files', '*.pickle')])
+                file = filedialog.asksaveasfile(mode = 'wb', filetypes = [('Pickled Files', '*.pickle')], defaultextension = [('Pickled Files', '*.pickle')])
                 pickle.dump(data,file)
+
+        class IORedirector():
+            def __init__(self,text_area):
+                self.text_area = text_area
+
+        class StdoutRedirector(IORedirector):
+            '''A class for redirecting stdout to this Text widget.'''
+            def write(self,output):
+                if 'Exception' in output or 'Error' in output:
+                    self.text_area.insert('end',output, 'warning')
+                else:
+                    self.text_area.insert('end',output)
+            def flush(self):
+                pass
+
+        def except_hook(type, value, traceback):
+            print("Youre a bitch")
+            exception_string = "".join(traceback.format_exception(type, value, traceback))
+            # do whatever you want from here
+            print(exception_string)
+
 
         # Button functions
 
-        def run():
+        def run(shortcut=False):
             i = float(text_editor.index(tk.INSERT))
-            text_editor.delete("insert-1c")
+            if shortcut: text_editor.delete("insert-1c")
             text = text_editor.get(1.0, tk.END)
             namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np, 'os':os}
+            if new_win.OUTPUT_CLOSED:
+                make_output_window()
+            redirecter = StdoutRedirector(new_win.text_output)
+            sys.stdout = redirecter
+            sys.stderr = redirecter
+            sys.excepthook = except_hook
             exec(text, namespace)
             if auto_refresh.get():
                 for fig in fig_list:
                     fig.canvas.draw()
                     fig.canvas.flush_events()
 
+        def make_output_window():
+            def on_closing():
+                new_win.OUTPUT_CLOSED = True
+                new_win.output_window.destroy()
+
+            new_win.output_window = tk.Toplevel(new_win)
+            new_win.output_window.title('Output')
+            new_win.text_output = scrolledtext.ScrolledText(new_win.output_window)
+            new_win.text_output.tag_config('warning', background="yellow", foreground="red")
+            new_win.text_output.pack(fill='both', expand=True)
+            new_win.output_window.protocol("WM_DELETE_WINDOW", on_closing)
+            new_win.OUTPUT_CLOSED = False
+
         def save():
             text = text_editor.get(1.0,tk.END)
             files = [('Python Files', '*.py'),
                      ('Text Document', '*.txt'),
                      ('All Files', '*.*')]
-            file = tk.filedialog.asksaveasfile(filetypes = files, defaultextension = files)
+            file = filedialog.asksaveasfile(filetypes = files, defaultextension = files)
             file.write(text)
             file.close()
         def change_dir():
-            directory = tk.filedialog.askdirectory()
+            directory = filedialog.askdirectory()
             os.chdir(directory)
 
+        def show_loc(event=None):
+            (line, char)= text_editor.index(tk.INSERT).split(".")
+            loc_Label.config(text='r {} c {}'.format(line, char))
+
+
+        def close():
+            sys.stdout = sys.__stdout__
+            sys.stdout = sys.__stderr__
+            sys.excepthook = sys.__excepthook__
+            new_win.destroy
+
+
         new_win = tk.Toplevel(root)
-        new_win.bind('<Control-Return>', lambda event: run())
+        new_win.OUTPUT_CLOSED = True
+        new_win.bind('<Control-Return>', lambda event: run(shortcut=True))
         auto_refresh = tk.IntVar()
 
         # Parent widget for the buttons
@@ -713,12 +770,15 @@ def main():
         chdirButton = tk.Button(buttons_frame, text='ChDir', width=EDITOR_WIDTH, command=change_dir)
         chdirButton.grid(row=3, column=0, padx=10, pady=MAIN_PAD)
 
-        btn_Close = tk.Button(buttons_frame, text='Close', width=EDITOR_WIDTH, command=new_win.destroy)
+        btn_Close = tk.Button(buttons_frame, text='Close', width=EDITOR_WIDTH, command=close)
         btn_Close.grid(row=4, column=0, padx=10, pady=MAIN_PAD)
 
         srefreshButton = tk.Checkbutton(buttons_frame, text = 'Refresh', variable = auto_refresh)
         srefreshButton.select()
         srefreshButton.grid(row=5,column = 0, padx=10, pady=MAIN_PAD)
+
+        loc_Label = tk.Label(buttons_frame)
+        loc_Label.grid(row=6,column = 0, padx=10, pady=MAIN_PAD)
 
         # Parent widget for the text editor
         text_Frame = tk.LabelFrame(new_win, text="Code", padx=5, pady=5)
@@ -731,10 +791,13 @@ def main():
         text_Frame.columnconfigure(0, weight=1)
 
         # Create the textbox
-        text_editor = tk.scrolledtext.ScrolledText(text_Frame)
+        text_editor = scrolledtext.ScrolledText(text_Frame)
         text_editor.insert('1.0',
                            '#from mihailpkg import cv_processing as cp\n' +
                            '#ax = axes_list[0]\n')
+        text_editor.bind('<KeyRelease>', show_loc)
+        text_editor.bind('<ButtonRelease-1>', show_loc)
+
         text_editor.grid(row=0, column=0,   sticky='NSEW')
 
         # Create menu bar
@@ -814,7 +877,7 @@ def main():
             for n,l in enumerate(Listbox_list):
                 for i in l.curselection():
                     selected_filename = l.get(i)
-                    new_filename = tk.simpledialog.askstring(title ='',
+                    new_filename = simpledialog.askstring(title ='',
                                                              prompt = 'Rename file below',
                                                              initialvalue = selected_filename)
                     if new_filename == None: return
@@ -1070,7 +1133,7 @@ def main():
             self.canvas.config(width=self.tkimage.width(), height=self.tkimage.height())
 
         def save(self, event=None):
-            filename = tk.filedialog.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
+            filename = filedialog.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
             self.image.save(filename)
 
         def open_next_previous(self, event = None, previous = False):
@@ -1325,7 +1388,7 @@ def main():
             self.bind('<Control-c>', lambda event: self.copy())
 
         def add_user_data(self):
-            filenameslist = tk.filedialog.askopenfilenames(filetypes = [('All files','*.*'),
+            filenameslist = filedialog.askopenfilenames(filetypes = [('All files','*.*'),
                                                           ('Text files','*.txt'),
                                                           ('CSV files','*.csv'),
                                                           ('FuelCell3 files','*.fcd'),
