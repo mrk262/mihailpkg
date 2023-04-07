@@ -155,12 +155,6 @@ def main():
                         ax.legend()
                         L = ax.get_legend()
                         L.set_draggable(True)
-                        try:
-                            format_data_labels(filenames[k])
-                            ax.set_xlabel(label[filenames[k]][x])
-                            ax.set_ylabel(label[filenames[k]][y])
-                        except:
-                            pass
                         ax.get_figure().canvas.draw()
                         ax.get_figure().canvas.flush_events()
 
@@ -606,31 +600,7 @@ def main():
 
 #%%--------------------------------secm plot popup menu commands---------------
 
-    def trim_secm(ax):
-        def slider_changed(event):
-            vmin = lower_index_slider.get()
-            vmax = upper_index_slider.get()
-            image.set_clim([vmin, vmax])
 
-        win = tk.Toplevel(root)
-        image = ax.get_images()[0]
-
-        if not hasattr(image, "original_vmin"):
-            image.original_vmin = image.get_clim()[0]
-        if not hasattr(image, "original_vmax"):
-            image.original_vmax = image.get_clim()[1]
-
-        resolution = (image.original_vmax - image.original_vmin) / 50
-
-        lower_index_slider = tk.Scale(win, from_= image.original_vmin, to = image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
-        lower_index_slider.set(image.original_vmin)
-        lower_index_slider.pack()
-
-        upper_index_slider = tk.Scale(win, from_= image.original_vmin, to=image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
-        upper_index_slider.set(image.original_vmax)
-        upper_index_slider.pack()
-
-        tk.Button(win, text='Close', command=win.destroy).pack()
 
 #%%--------------------------------main window popup menu commands-------------
 
@@ -641,6 +611,116 @@ def main():
 
     def code_input():
         EDITOR_WIDTH = 10
+        class CodeWindow(tk.Toplevel):
+            def __init__(self, parent, *args, **kwargs):
+                tk.Toplevel.__init__(self, parent, *args, **kwargs)
+
+                self.OUTPUT_CLOSED = True           #track if output window is closed
+
+                self.bind('<Control-Return>', lambda event: self.run(shortcut=True))
+                self.auto_refresh = tk.IntVar()
+
+                self.buttons_frame = tk.Frame(self)
+                self.buttons_frame.grid(row=0, column=0, sticky='NS')
+
+                self.spacer = tk.Label(self.buttons_frame, text='   ', width=EDITOR_WIDTH)
+                self.spacer.grid(row=0, column=0, padx=10, pady=MAIN_PAD)
+
+                self.btn_run = tk.Button(self.buttons_frame, text='Run', width=EDITOR_WIDTH, command=self.run)
+                self.btn_run.grid(row=1, column=0, padx=10, pady=MAIN_PAD)
+
+                self.btn_File = tk.Button(self.buttons_frame, text='Save', width=EDITOR_WIDTH, command=self.save)
+                self.btn_File.grid(row=2, column=0, padx=10, pady=MAIN_PAD)
+
+                self.chdirButton = tk.Button(self.buttons_frame, text='ChDir', width=EDITOR_WIDTH, command=self.change_dir)
+                self.chdirButton.grid(row=3, column=0, padx=10, pady=MAIN_PAD)
+
+                self.btn_Close = tk.Button(self.buttons_frame, text='Close', width=EDITOR_WIDTH, command=self.close)
+                self.btn_Close.grid(row=4, column=0, padx=10, pady=MAIN_PAD)
+
+                self.srefreshButton = tk.Checkbutton(self.buttons_frame, text = 'Refresh', variable = self.auto_refresh)
+                self.srefreshButton.select()
+                self.srefreshButton.grid(row=5,column = 0, padx=10, pady=MAIN_PAD)
+
+                self.loc_Label = tk.Label(self.buttons_frame)
+                self.loc_Label.grid(row=6,column = 0, padx=10, pady=MAIN_PAD)
+
+                # Parent widget for the text editor
+                self.text_Frame = tk.LabelFrame(self, text="Code", padx=5, pady=5)
+                self.text_Frame.grid(row=0, column=1, rowspan=5, padx=MAIN_PAD, pady=MAIN_PAD, sticky='NSEW')
+
+                self.columnconfigure(1, weight=1)
+                self.rowconfigure(0, weight=1)
+
+                self.text_Frame.rowconfigure(0, weight=1)
+                self.text_Frame.columnconfigure(0, weight=1)
+
+                # Create the textbox
+                self.text_editor = scrolledtext.ScrolledText(self.text_Frame)
+                self.text_editor.insert('1.0',
+                                   '#from mihailpkg import cv_processing as cp\n' +
+                                   '#ax = axes_list[0]\n')
+                self.text_editor.bind('<KeyRelease>', self.show_loc)
+                self.text_editor.bind('<ButtonRelease-1>', self.show_loc)
+
+                self.text_editor.grid(row=0, column=0,   sticky='NSEW')
+
+            def save(self):
+                text = self.text_editor.get(1.0,tk.END)
+                files = [('Python Files', '*.py'),
+                         ('Text Document', '*.txt'),
+                         ('All Files', '*.*')]
+                file = filedialog.asksaveasfile(filetypes = files, defaultextension = files)
+                file.write(text)
+                file.close()
+
+            def change_dir(self):
+                directory = filedialog.askdirectory()
+                os.chdir(directory)
+
+            def show_loc(self, event=None):
+                (line, char)= self.text_editor.index(tk.INSERT).split(".")
+                self.loc_Label.config(text='r {} c {}'.format(line, char))
+
+            def close(self):
+                self.destroy
+
+            def run(self, shortcut=False):
+                i = float(self.text_editor.index(tk.INSERT))
+                if shortcut: self.text_editor.delete("insert-1c")
+                text = self.text_editor.get(1.0, tk.END)
+                namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np, 'os':os}
+                if self.OUTPUT_CLOSED: self.make_output_window()
+                exec(text, namespace)
+                if self.auto_refresh.get():
+                    for fig in fig_list:
+                        fig.canvas.draw()
+                        fig.canvas.flush_events()
+
+            def make_output_window(self):
+                self.output_window = OutputWindow(self)
+
+        class OutputWindow(tk.Toplevel):
+            def __init__(self, parent, *args, **kwargs):
+                tk.Toplevel.__init__(self, parent, *args, **kwargs)
+                self.parent = parent
+                self.title('Output')
+                self.text_output = scrolledtext.ScrolledText(self)
+                self.text_output.tag_config('warning', background="yellow", foreground="red")
+                self.text_output.pack(fill='both', expand=True)
+                self.protocol("WM_DELETE_WINDOW", self.on_closing)
+                self.parent.OUTPUT_CLOSED = False
+
+                redirecter = StdoutRedirector(self.text_output)
+                sys.stdout = redirecter
+                sys.stderr = redirecter
+
+            def on_closing(self):
+                self.parent.OUTPUT_CLOSED = True
+                sys.stdout = sys.__stdout__
+                sys.stdout = sys.__stderr__
+                self.destroy()
+
         class EditorAppMenubar(tk.Menu):
             def __init__(self, parent, *args, **kwargs):
                 tk.Menu.__init__(self, parent, *args, **kwargs)
@@ -665,7 +745,7 @@ def main():
                     command = self.insert_test)
 
             def insert_test(self):
-                text_editor.insert(tk.END,"print('Test')")
+                code_win.text_editor.insert(tk.END,"print('Test')")
 
             def save_data(self):
                 import pickle
@@ -686,157 +766,11 @@ def main():
             def flush(self):
                 pass
 
-        def except_hook(type, value, traceback):
-            print("Youre a bitch")
-            exception_string = "".join(traceback.format_exception(type, value, traceback))
-            # do whatever you want from here
-            print(exception_string)
-
-
-        # Button functions
-
-        def run(shortcut=False):
-            i = float(text_editor.index(tk.INSERT))
-            if shortcut: text_editor.delete("insert-1c")
-            text = text_editor.get(1.0, tk.END)
-            namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np, 'os':os}
-            if new_win.OUTPUT_CLOSED:
-                make_output_window()
-            redirecter = StdoutRedirector(new_win.text_output)
-            sys.stdout = redirecter
-            sys.stderr = redirecter
-            sys.excepthook = except_hook
-            exec(text, namespace)
-            if auto_refresh.get():
-                for fig in fig_list:
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
-
-        def make_output_window():
-            def on_closing():
-                new_win.OUTPUT_CLOSED = True
-                new_win.output_window.destroy()
-
-            new_win.output_window = tk.Toplevel(new_win)
-            new_win.output_window.title('Output')
-            new_win.text_output = scrolledtext.ScrolledText(new_win.output_window)
-            new_win.text_output.tag_config('warning', background="yellow", foreground="red")
-            new_win.text_output.pack(fill='both', expand=True)
-            new_win.output_window.protocol("WM_DELETE_WINDOW", on_closing)
-            new_win.OUTPUT_CLOSED = False
-
-        def save():
-            text = text_editor.get(1.0,tk.END)
-            files = [('Python Files', '*.py'),
-                     ('Text Document', '*.txt'),
-                     ('All Files', '*.*')]
-            file = filedialog.asksaveasfile(filetypes = files, defaultextension = files)
-            file.write(text)
-            file.close()
-        def change_dir():
-            directory = filedialog.askdirectory()
-            os.chdir(directory)
-
-        def show_loc(event=None):
-            (line, char)= text_editor.index(tk.INSERT).split(".")
-            loc_Label.config(text='r {} c {}'.format(line, char))
-
-
-        def close():
-            sys.stdout = sys.__stdout__
-            sys.stdout = sys.__stderr__
-            sys.excepthook = sys.__excepthook__
-            new_win.destroy
-
-
-        new_win = tk.Toplevel(root)
-        new_win.OUTPUT_CLOSED = True
-        new_win.bind('<Control-Return>', lambda event: run(shortcut=True))
-        auto_refresh = tk.IntVar()
-
-        # Parent widget for the buttons
-        buttons_frame = tk.Frame(new_win)#, relief=tk.RAISED, bd=2)
-        buttons_frame.grid(row=0, column=0, sticky='NS')
-
-        spacer = tk.Label(buttons_frame, text='   ', width=EDITOR_WIDTH)
-        spacer.grid(row=0, column=0, padx=10, pady=MAIN_PAD)
-
-        btn_run = tk.Button(buttons_frame, text='Run', width=EDITOR_WIDTH, command=run)
-        btn_run.grid(row=1, column=0, padx=10, pady=MAIN_PAD)
-
-        btn_File = tk.Button(buttons_frame, text='Save', width=EDITOR_WIDTH, command=save)
-        btn_File.grid(row=2, column=0, padx=10, pady=MAIN_PAD)
-
-        chdirButton = tk.Button(buttons_frame, text='ChDir', width=EDITOR_WIDTH, command=change_dir)
-        chdirButton.grid(row=3, column=0, padx=10, pady=MAIN_PAD)
-
-        btn_Close = tk.Button(buttons_frame, text='Close', width=EDITOR_WIDTH, command=close)
-        btn_Close.grid(row=4, column=0, padx=10, pady=MAIN_PAD)
-
-        srefreshButton = tk.Checkbutton(buttons_frame, text = 'Refresh', variable = auto_refresh)
-        srefreshButton.select()
-        srefreshButton.grid(row=5,column = 0, padx=10, pady=MAIN_PAD)
-
-        loc_Label = tk.Label(buttons_frame)
-        loc_Label.grid(row=6,column = 0, padx=10, pady=MAIN_PAD)
-
-        # Parent widget for the text editor
-        text_Frame = tk.LabelFrame(new_win, text="Code", padx=5, pady=5)
-        text_Frame.grid(row=0, column=1, rowspan=5, padx=MAIN_PAD, pady=MAIN_PAD, sticky='NSEW')
-
-        new_win.columnconfigure(1, weight=1)
-        new_win.rowconfigure(0, weight=1)
-
-        text_Frame.rowconfigure(0, weight=1)
-        text_Frame.columnconfigure(0, weight=1)
-
-        # Create the textbox
-        text_editor = scrolledtext.ScrolledText(text_Frame)
-        text_editor.insert('1.0',
-                           '#from mihailpkg import cv_processing as cp\n' +
-                           '#ax = axes_list[0]\n')
-        text_editor.bind('<KeyRelease>', show_loc)
-        text_editor.bind('<ButtonRelease-1>', show_loc)
-
-        text_editor.grid(row=0, column=0,   sticky='NSEW')
-
-        # Create menu bar
-        manubar = EditorAppMenubar(new_win)
-
+        code_win = CodeWindow(root)
+        menubar = EditorAppMenubar(code_win)
 
     def replot_secm(fig):
         pass
-
-    def format_data_labels(filename):
-        for i,col_label in enumerate(label[filename]):
-            if col_label == 'Time (Sec)':
-                label[filename][i] = 'Time / Sec'
-            if col_label == 'I (A)':
-                label[filename][i] = 'Current / Amps'
-            if col_label == 'I (mA/cmÂ²)':
-                label[filename][i] = 'Current density / mA/cm$^2$'
-            if col_label == 'Power (Watts)':
-                label[filename][i] = 'Power / Watts'
-            if col_label == 'Power (mW/cmÂ²)':
-                label[filename][i] = 'Power density / mW/cm$^2$'
-            if col_label == 'E_Stack (V)':
-                label[filename][i] = 'Cell potential / V'
-            if col_label == 'Temp (C)':
-                label[filename][i] = 'Cell temp / $^o$C'
-            if col_label == 'HFR (mOhm)':
-                label[filename][i] = 'HFR / mOhm'
-            if col_label == 'Z_Real (Ohm)':
-                label[filename][i] = 'Z$_{Real}$ / $\Omega$'
-            if col_label == 'Z_Imag (Ohm)':
-                label[filename][i] = 'Z$_{Imag}$ / $\Omega$'
-            # if col_label == 'Time (Sec)':
-            #     label[filename][i] = 'Time / sec'
-            # if col_label == 'Time (Sec)':
-            #     label[filename][i] = 'Time / sec'
-            # if col_label == 'Time (Sec)':
-            #     label[filename][i] = 'Time / sec'
-            # if col_label == 'Time (Sec)':
-            #     label[filename][i] = 'Time / sec'
 
 #%%--------------------------------build the Main window-----------------------
 
@@ -1041,7 +975,7 @@ def main():
                     command = lambda: add_text(ax))
                 self.add_command(
                     label = 'trim data',
-                    command = lambda: trim_secm(ax))
+                    command = self.parent.trim_secm)
 
 
         def __init__(self, parent, fig, *args, **kwargs):
@@ -1057,6 +991,7 @@ def main():
             self.canvas.get_tk_widget().pack(side="bottom", fill='both',expand=True)
             self.canvas.get_tk_widget().bind('<Button-3>', lambda x: self.popup_menu(event=x))
             self.canvas.get_tk_widget().bind('t', lambda x: add_text(self.ax, event=x))
+            self.canvas.get_tk_widget().bind('r', self.refresh)
 
             self.toolbarFrame = tk.Frame(master=self)
             self.toolbarFrame.pack(side="top",fill='x',expand=False)
@@ -1067,6 +1002,38 @@ def main():
                 self.app_rclick_menu.tk_popup(event.x_root, event.y_root)
             finally:
                 self.app_rclick_menu.grab_release()
+
+        def refresh(self, event=None):
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+
+
+        def trim_secm(self):
+            def slider_changed(event):
+                vmin = lower_index_slider.get()
+                vmax = upper_index_slider.get()
+                image.set_clim([vmin, vmax])
+                self.refresh()
+
+            win = tk.Toplevel(self)
+            image = self.ax.get_images()[0]
+
+            if not hasattr(image, "original_vmin"):
+                image.original_vmin = image.get_clim()[0]
+            if not hasattr(image, "original_vmax"):
+                image.original_vmax = image.get_clim()[1]
+
+            resolution = (image.original_vmax - image.original_vmin) / 50
+
+            lower_index_slider = tk.Scale(win, from_= image.original_vmin, to = image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
+            lower_index_slider.set(image.original_vmin)
+            lower_index_slider.pack()
+
+            upper_index_slider = tk.Scale(win, from_= image.original_vmin, to=image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
+            upper_index_slider.set(image.original_vmax)
+            upper_index_slider.pack()
+
+            tk.Button(win, text='Close', command=win.destroy).pack()
 
 
 #%%--------------------------------build the line plot window------------------
