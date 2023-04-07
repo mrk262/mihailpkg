@@ -7,22 +7,14 @@ Created on Sun Apr 11 19:27:44 2021
 
 
 import numpy as np
-from math import ceil
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
-from matplotlib import image as mpimg
 from PIL import Image, ImageDraw, ImageTk
 import tkinter as tk
-import tkinter.filedialog as fd
-import tkinter.simpledialog as sd
-import tkinter.scrolledtext as st
 import warnings
 import os
-import threading
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
-import matplotlib.transforms as mtransforms
-
 
 warnings.filterwarnings("ignore", message="This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.")
 # warnings.filterwarnings("ignore", message="Starting a Matplotlib GUI outside of the main thread will likely fail.")
@@ -73,7 +65,7 @@ def main():
 
     def selectfiles():
         """Allow user to select data files from a directory, then display filenames for interactive plotting."""
-        filenameslist = fd.askopenfilenames(filetypes = [('All files','*.*'),
+        filenameslist = tk.filedialog.askopenfilenames(filetypes = [('All files','*.*'),
                                                       ('Text files','*.txt'),
                                                       ('CSV files','*.csv'),
                                                       ('FuelCell3 files','*.fcd'),
@@ -171,7 +163,7 @@ def main():
 
     def plot_2Dmap():
         """Plot a heat map from a 3 column Array of x,y,z data points."""
-        string = sd.askstring('title','input bulk steady state curent(s) (comma separated) for normalization\n')
+        string = tk.simpledialog.askstring('title','input bulk steady state curent(s) (comma separated) for normalization\n')
         iss_list = string.split(',')
         k = -1                                                                      #tracks the index of file in file_names
         n= -1                                                                       #tracks number of plots made
@@ -589,7 +581,7 @@ def main():
 
         def save2():
             win.destroy()
-            file = fd.asksaveasfile(filetypes = [('Multi line graph', '*.mlg'), ('All Files', '*.*')], defaultextension = [('Multi line graph', '*.mlg'), ('All Files', '*.*')])
+            file = tk.filedialog.asksaveasfile(filetypes = [('Multi line graph', '*.mlg'), ('All Files', '*.*')], defaultextension = [('Multi line graph', '*.mlg'), ('All Files', '*.*')])
             x_label = ax.get_xlabel()
             y_label = ax.get_ylabel()
             file.write(x_label + '\t' + y_label + '\n')
@@ -673,7 +665,7 @@ def main():
 
             def save_data(self):
                 import pickle
-                file = fd.asksaveasfile(mode = 'wb', filetypes = [('Pickled Files', '*.pickle')], defaultextension = [('Pickled Files', '*.pickle')])
+                file = tk.filedialog.asksaveasfile(mode = 'wb', filetypes = [('Pickled Files', '*.pickle')], defaultextension = [('Pickled Files', '*.pickle')])
                 pickle.dump(data,file)
 
         # Button functions
@@ -694,11 +686,11 @@ def main():
             files = [('Python Files', '*.py'),
                      ('Text Document', '*.txt'),
                      ('All Files', '*.*')]
-            file = fd.asksaveasfile(filetypes = files, defaultextension = files)
+            file = tk.filedialog.asksaveasfile(filetypes = files, defaultextension = files)
             file.write(text)
             file.close()
         def change_dir():
-            directory = fd.askdirectory()
+            directory = tk.filedialog.askdirectory()
             os.chdir(directory)
 
         new_win = tk.Toplevel(root)
@@ -739,7 +731,7 @@ def main():
         text_Frame.columnconfigure(0, weight=1)
 
         # Create the textbox
-        text_editor = st.ScrolledText(text_Frame)
+        text_editor = tk.scrolledtext.ScrolledText(text_Frame)
         text_editor.insert('1.0',
                            '#from mihailpkg import cv_processing as cp\n' +
                            '#ax = axes_list[0]\n')
@@ -822,7 +814,7 @@ def main():
             for n,l in enumerate(Listbox_list):
                 for i in l.curselection():
                     selected_filename = l.get(i)
-                    new_filename = sd.askstring(title ='',
+                    new_filename = tk.simpledialog.askstring(title ='',
                                                              prompt = 'Rename file below',
                                                              initialvalue = selected_filename)
                     if new_filename == None: return
@@ -1078,7 +1070,7 @@ def main():
             self.canvas.config(width=self.tkimage.width(), height=self.tkimage.height())
 
         def save(self, event=None):
-            filename = fd.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
+            filename = tk.filedialog.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
             self.image.save(filename)
 
         def open_next_previous(self, event = None, previous = False):
@@ -1333,7 +1325,7 @@ def main():
             self.bind('<Control-c>', lambda event: self.copy())
 
         def add_user_data(self):
-            filenameslist = fd.askopenfilenames(filetypes = [('All files','*.*'),
+            filenameslist = tk.filedialog.askopenfilenames(filetypes = [('All files','*.*'),
                                                           ('Text files','*.txt'),
                                                           ('CSV files','*.csv'),
                                                           ('FuelCell3 files','*.fcd'),
@@ -1398,8 +1390,5 @@ def main():
 
     root.mainloop()
 
-def start_app():
-    t1 = threading.Thread(target=main)
-    t1.start()
 if __name__ == '__main__':
     main()
