@@ -5,7 +5,7 @@ Created on Sun Apr 11 19:27:44 2021
 @author: Mihail
 """
 
-
+from mihailpkg import MenuedListbox
 import numpy as np
 from math import ceil
 import matplotlib.pyplot as plt
@@ -1108,9 +1108,9 @@ def main():
             if not (0.99 < self.magnification < 1.01):
                 w, h = self.original_image.width, self.original_image.height
                 self.image = self.original_image.resize((round(w*self.magnification), round(h*self.magnification)))
-                self.title("{}x{} {:.0f}%\t".format(self.tkimage.width(), self.tkimage.height(), self.magnification*100) + self.filename)
+                self.title("{}x{} {:.0f}%\t".format(self.image.width, self.image.height, self.magnification*100) + self.filename)
             else:
-                self.title("{}x{}\t".format(self.tkimage.width(), self.tkimage.height()) + self.filename)
+                self.title("{}x{}\t".format(self.image.width, self.image.height) + self.filename)
 
             self.update_image()
             data[filename] = self.original_image
@@ -1122,11 +1122,11 @@ def main():
 
             if 0.99 < self.magnification < 1.01:
                 self.image = self.original_image.copy()
-                self.title("{}x{}\t".format(self.tkimage.width(), self.tkimage.height()) + self.filename)
+                self.title("{}x{}\t".format(self.image.width, self.image.height) + self.filename)
 
             else:
                 self.image = self.original_image.resize((round(w*self.magnification), round(h*self.magnification)))
-                self.title("{}x{} {:.0f}%\t".format(self.tkimage.width(), self.tkimage.height(), self.magnification*100) + self.filename)
+                self.title("{}x{} {:.0f}%\t".format(self.image.width, self.image.height, self.magnification*100) + self.filename)
 
             self.tkimage = ImageTk.PhotoImage(self.image)
             self.update_image()
@@ -1148,10 +1148,15 @@ def main():
                     pt2.config(text='{}, {}'.format(x, y))
                     pt2.x, pt2.y = x, y
                     distance = ((pt1.x - pt2.x)**2 + (pt1.y - pt2.y)**2)**0.5
-                    dist.config(text='{:.1f} px'.format(distance),fg='red')
+                    dist.config(text='{:.0f} px'.format(distance),fg='red')
                     xy = [(pt1.x, pt1.y),(pt2.x, pt2.y)]
-                    draw = ImageDraw.Draw(self.image)
-                    draw.line(xy, fill='red')
+                    try:
+                        draw = ImageDraw.Draw(self.image)
+                        draw.line(xy, fill='red')
+                    except:
+                        self.image = self.image.convert(mode='RGBA')
+                        draw = ImageDraw.Draw(self.image)
+                        draw.line(xy, fill='red')
                     self.update_image()
 
                     return
@@ -1162,7 +1167,19 @@ def main():
                 self.update_image()
                 win.destroy()
 
+            def measure(event=None):
+                if measure_button.cget('text') == 'Measure' or measure_button.cget('text') == 'Measure Off':
+                    self.canvas.bind('<Button-1>', lambda x: return_pointer_coord(event=x))
+                    measure_button.config(text='Measure On')
+                    return
+
+                if measure_button.cget('text') == 'Measure On':
+                    self.canvas.unbind('<Button-1>')
+                    measure_button.config(text='Measure Off')
+                    return
+
             win = tk.Toplevel(root)
+            win.protocol('WM_DELETE_WINDOW', close_window)
             win.resizable(False,False)
             tk.Label(win, text='pt1:', width=WIDTH).grid(row=0, column=0)
             pt1 = tk.Label(win, text='', width=WIDTH)
@@ -1175,19 +1192,24 @@ def main():
             dist = tk.Label(win, text='', width=WIDTH)
             dist.grid(row=2, column=1)
 
-            save_button = tk.Button(win, text='Save', command=self.save, width=WIDTH)
-            save_button.grid(row=3, column=0, columnspan=1)
+            measure_button = tk.Button(win, text='Measure', width=10, command=measure)
+
+            measure_button.grid(row=3, column=0, columnspan=1)
             close_button = tk.Button(win, text='Close', command=close_window, width=WIDTH)
             close_button.grid(row=3, column=1, columnspan=1)
-            self.canvas.bind('<Button-1>', lambda x: return_pointer_coord(event=x))
 
         def text(self, event=None):
             WIDTH = 20
             def return_pointer_coord(event=None):
                 x, y = event.x, event.y
+                try:
+                    draw = ImageDraw.Draw(self.image)
+                    draw.text((x,y), textEntry.get(), fill='red')
+                except:
+                    self.image = self.image.convert(mode='RGBA')
+                    draw = ImageDraw.Draw(self.image)
+                    draw.text((x,y), textEntry.get(), fill='red')
 
-                draw = ImageDraw.Draw(self.image)
-                draw.text((x,y), textEntry.get(), fill='red')
                 self.update_image()
 
             def close_window():
@@ -1196,20 +1218,29 @@ def main():
                 self.update_image()
                 win.destroy()
 
+            def text(event=None):
+                if text_button.cget('text') == 'Text' or text_button.cget('text') == 'Text Off':
+                    self.canvas.bind('<Button-1>', lambda x: return_pointer_coord(event=x))
+                    text_button.config(text='Text On')
+                    return
+
+                if text_button.cget('text') == 'Text On':
+                    self.canvas.unbind('<Button-1>')
+                    text_button.config(text='Text Off')
+                    return
+
             win = tk.Toplevel(root)
+            win.protocol('WM_DELETE_WINDOW', close_window)
             win.resizable(False,False)
 
             tk.Label(win, text='Text to insert', width=WIDTH).grid(row=0, column=0, columnspan=2)
             textEntry = tk.Entry(win, text='', width=WIDTH)
             textEntry.grid(row=1, column=0, columnspan=2, pady=10)
 
-
-
-            save_button = tk.Button(win, text='Save', command=self.save, width=10)
-            save_button.grid(row=3, column=0, columnspan=1)
+            text_button = tk.Button(win, text='Text', width=10, command=text)
+            text_button.grid(row=3, column=0, columnspan=1)
             close_button = tk.Button(win, text='Close', command=close_window, width=10)
             close_button.grid(row=3, column=1, columnspan=1)
-            self.canvas.bind('<Button-1>', lambda x: return_pointer_coord(event=x))
 
 
     class LinePlotWindow(tk.Toplevel):
@@ -1270,85 +1301,7 @@ def main():
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
 
-    class MenuedListbox(tk.Listbox):
-        def __init__(self, parent, *args, **kwargs):
-            tk.Listbox.__init__(self, parent, *args, **kwargs)
 
-            self.bind('a', lambda event: self.select_all())
-            self.bind('<Shift-A>', lambda event: self.deselect())
-
-            self.menu = tk.Menu(self)
-            self.menu.parent = self
-
-            self.menu.add_command(
-                label = 'add',
-                command = self.add_user_data)
-            self.menu.add_command(
-                label = 'sort',
-                command = self.sort_labels)
-            self.menu.add_command(
-                    label = 'select all',
-                    command = self.select_all)
-            self.menu.add_command(
-                    label = 'copy',
-                    command = self.copy)
-
-            self.bind('<Control-c>', lambda event: self.copy())
-
-        def add_user_data(self):
-            filenameslist = fd.askopenfilenames(filetypes = [('All files','*.*'),
-                                                          ('Text files','*.txt'),
-                                                          ('CSV files','*.csv'),
-                                                          ('FuelCell3 files','*.fcd'),
-                                                          ('NPY file','*.npy'),
-                                                          ('MLG file','*.mlg')])
-            data_folder = filenameslist[0].split('/')[-2]
-            label_list = [Entry.original_title for Entry in directory_title_Entry_list]
-            if label_list.index(data_folder) != Listbox_list.index(self):
-                print('Wrong Directory')
-                return
-            for i,full_filename in enumerate(filenameslist):
-                if full_filename in full_filenames_list: continue
-                full_filenames_list.append(full_filename)
-                if '.' == full_filename[-4]:
-                    filename = full_filename.split('/')[-1][:-4]
-                    if filename in filenames:
-                        filename = filename + '$'
-                    filenames.append(filename)
-                else:
-                    filename = full_filename.split('/')[-1]
-                    if filename in filenames:
-                        filename = filename + '$'
-                    filenames.append(filename)
-                self.insert("end",filenames[-1])
-
-        def sort_labels(self):
-            labels = list(self.get(0,'end'))
-            labels.sort()
-            self.delete(0,'end')
-            for label in labels:
-                self.insert('end',label)
-
-        def select_all(self):
-            self.select_set(0,tk.END)
-
-        def deselect(self):
-            self.selection_clear(0,'end')
-
-        def copy(self):
-            text = ''
-            for i in self.curselection():
-                filename = self.get(i)
-                text += "'" + filename + "'" + '\n'
-            root.clipboard_clear()
-            root.clipboard_append(text)
-            self.selection_clear(0,'end')
-
-        def popup_menu(self, event):
-            try:
-                self.menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                self.menu.grab_release()
 
 
 #%%--------------------------------Main Program--------------------------------
