@@ -9,6 +9,7 @@ Created on Sun Apr 11 19:27:44 2021
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
+from matplotlib import cm
 from PIL import Image, ImageDraw, ImageTk
 import tkinter as tk
 from tkinter import scrolledtext
@@ -171,13 +172,6 @@ def main():
                 if data_num in Listbox_reference.curselection():
                     n+=1
 
-                    fig,ax = plt.subplots()
-                    fig_list.append(fig)
-                    axes_list.append(ax)
-                    secm_window = SecmWindow(root,fig)
-                    ax.set_xlabel('Distance / $\mu$m')
-                    ax.set_ylabel('Distance / $\mu$m')
-
                     data_array = parse_file(filenames[k],full_filenames_list[k])
                     try:
                         iss = float(iss_list[n])
@@ -217,15 +211,12 @@ def main():
                         Z = Z.reshape(ypts,xpts)
 
 
-                    secm_window.image = ax.imshow(Z, extent=[X.min(),X.max(),Y.min(),Y.max()], origin='lower', interpolation='bicubic', cmap='Spectral_r')
-                    ax.set_aspect('equal')
-                    secm_window.colorbar = fig.colorbar(secm_window.image,ax=ax, format = '%.2f')
-                    fig.set_size_inches(6,5)
+                    fig,ax = plt.subplots()
+                    extent=[X.min(),X.max(),Y.min(),Y.max()]
+                    secm_window = SecmWindow(root,fig, Z, extent=extent, filename=filenames[k], iss=iss)
 
-                    secm_window.title('fig ' + str(fig.number - 1) + ' | ' + filenames[k] + ' | ' + str(iss))
-                    secm_window.ax = ax
-                    secm_window.Z = Z
-
+                    fig_list.append(fig)
+                    axes_list.append(ax)
                     data[filenames[k]] = (X,Y,Z * iss)
                     SECM_plot_ref_list.append((fig,ax,secm_window.image,secm_window.colorbar))
 
@@ -930,8 +921,8 @@ def main():
             self.plot2D_Button = tk.Button(self,text='Plot SECM',command = plot_2Dmap, width=MAIN_WIDTH)
             self.plot2D_Button.grid(row = 3, column = 1,columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
-            self.toggleLegend_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image_file=True))
-            self.toggleLegend_Button.grid(row = 4, column = 0, columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
+            self.code_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image_file=True))
+            self.code_Button.grid(row = 4, column = 0, columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
             self.code_Button = tk.Button(self,text='Code',command = code_input, width=MAIN_WIDTH)
             self.code_Button.grid(row = 4, column = 1,columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
@@ -976,13 +967,34 @@ def main():
                 self.add_command(
                     label = 'trim data',
                     command = self.parent.trim_secm)
+                self.add_command(
+                    label = 'save bitmap',
+                    command = self.parent.save_bitmap)
 
 
-        def __init__(self, parent, fig, *args, **kwargs):
+        def __init__(self, parent, fig, Z, extent=None, filename='', iss=1, *args, **kwargs):
             tk.Toplevel.__init__(self, parent, *args, **kwargs)
 
             self.fig = fig
+            self.fig.set_size_inches(6,5)
             self.ax = fig.axes[0]
+            self.Z = Z
+            self.extent  = extent
+            self.filename = filename
+            self.iss = str(iss)
+
+            self.image = self.ax.imshow(self.Z, extent=self.extent, origin='lower', interpolation='bicubic', cmap='Spectral_r')
+            self.image.original_vmin, self.image.original_vmax = self.image.get_clim()
+            self.image.vmin, self.image.vmax = self.image.get_clim()
+
+            self.colorbar = self.fig.colorbar(self.image, ax=self.ax, format = '%.2f')
+            self.fig.set_size_inches(6,5)
+
+            self.title('fig ' + str(self.fig.number - 1) + ' | ' + self.filename + ' | ' + self.iss)
+
+            self.ax.set_xlabel('Distance / $\mu$m')
+            self.ax.set_ylabel('Distance / $\mu$m')
+            self.ax.set_aspect('equal')
 
             self.app_rclick_menu = SecmWindow.AppRclickMenu(self,self.ax)
 
@@ -1007,33 +1019,34 @@ def main():
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
 
-
         def trim_secm(self):
             def slider_changed(event):
-                vmin = lower_index_slider.get()
-                vmax = upper_index_slider.get()
-                image.set_clim([vmin, vmax])
+                self.image.vmin = lower_index_slider.get()
+                self.image.vmax = upper_index_slider.get()
+                self.image.set_clim([self.image.vmin, self.image.vmax])
                 self.refresh()
 
             win = tk.Toplevel(self)
-            image = self.ax.get_images()[0]
 
-            if not hasattr(image, "original_vmin"):
-                image.original_vmin = image.get_clim()[0]
-            if not hasattr(image, "original_vmax"):
-                image.original_vmax = image.get_clim()[1]
+            resolution = (self.image.original_vmax - self.image.original_vmin) / 50
 
-            resolution = (image.original_vmax - image.original_vmin) / 50
-
-            lower_index_slider = tk.Scale(win, from_= image.original_vmin, to = image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
-            lower_index_slider.set(image.original_vmin)
+            lower_index_slider = tk.Scale(win, from_= self.image.original_vmin, to = self.image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
+            lower_index_slider.set(self.image.original_vmin)
             lower_index_slider.pack()
 
-            upper_index_slider = tk.Scale(win, from_= image.original_vmin, to=image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
-            upper_index_slider.set(image.original_vmax)
+            upper_index_slider = tk.Scale(win, from_= self.image.original_vmin, to=self.image.original_vmax, orient=tk.HORIZONTAL, length=600, command=slider_changed, resolution = resolution)
+            upper_index_slider.set(self.image.original_vmax)
             upper_index_slider.pack()
 
             tk.Button(win, text='Close', command=win.destroy).pack()
+
+        def save_bitmap(self):
+            filename = filedialog.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
+            arr = self.Z.clip(self.image.vmin, self.image.vmax)[::-1,:] # trim data and set origin as lower left
+            arr = (arr - self.image.vmin)/(self.image.vmax - self.image.vmin) # normalize 0 to 1
+            img = Image.fromarray(np.uint8(cm.Spectral_r(arr)*255))
+            img.save(filename)
+
 
 
 #%%--------------------------------build the line plot window------------------
@@ -1191,8 +1204,15 @@ def main():
 
             def close_window():
                 self.canvas.unbind('<Button-1>')
+                self.bind('<Right>', lambda x: self.open_next_previous(event=x))
+                self.bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
+                self.bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
+                self.bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
+                self.bind('<m>', lambda x: self.measure(event=x))
                 self.image = self.original_image.copy()
                 self.update_image()
+
+
                 win.destroy()
 
             def measure(event=None):
@@ -1209,6 +1229,13 @@ def main():
             win = tk.Toplevel(root)
             win.protocol('WM_DELETE_WINDOW', close_window)
             win.resizable(False,False)
+
+            self.unbind('<Right>')
+            self.unbind('<Left>')
+            self.unbind('<Up>')
+            self.unbind('<Down>')
+            self.unbind('<m>')
+
             tk.Label(win, text='pt1:', width=WIDTH).grid(row=0, column=0)
             pt1 = tk.Label(win, text='', width=WIDTH)
             pt1.active = False
@@ -1242,6 +1269,11 @@ def main():
 
             def close_window():
                 self.canvas.unbind('<Button-1>')
+                self.bind('<Right>', lambda x: self.open_next_previous(event=x))
+                self.bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
+                self.bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
+                self.bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
+                self.bind('<t>', lambda x: self.text(event=x))
                 self.image = self.original_image.copy()
                 self.update_image()
                 win.destroy()
@@ -1260,6 +1292,12 @@ def main():
             win = tk.Toplevel(root)
             win.protocol('WM_DELETE_WINDOW', close_window)
             win.resizable(False,False)
+
+            self.unbind('<Right>')
+            self.unbind('<Left>')
+            self.unbind('<Up>')
+            self.unbind('<Down>')
+            self.unbind('<t>')
 
             tk.Label(win, text='Text to insert', width=WIDTH).grid(row=0, column=0, columnspan=2)
             textEntry = tk.Entry(win, text='', width=WIDTH)
