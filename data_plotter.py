@@ -5,7 +5,7 @@ Created on Sun Apr 11 19:27:44 2021
 @author: Mihail
 """
 
-from mihailpkg import MenuedListbox
+
 import numpy as np
 from math import ceil
 import matplotlib.pyplot as plt
@@ -682,7 +682,7 @@ def main():
             i = float(text_editor.index(tk.INSERT))
             text_editor.delete("insert-1c")
             text = text_editor.get(1.0, tk.END)
-            namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np}
+            namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np, 'os':os}
             exec(text, namespace)
             if auto_refresh.get():
                 for fig in fig_list:
@@ -697,6 +697,9 @@ def main():
             file = fd.asksaveasfile(filetypes = files, defaultextension = files)
             file.write(text)
             file.close()
+        def change_dir():
+            directory = fd.askdirectory()
+            os.chdir(directory)
 
         new_win = tk.Toplevel(root)
         new_win.bind('<Control-Return>', lambda event: run())
@@ -715,12 +718,15 @@ def main():
         btn_File = tk.Button(buttons_frame, text='Save', width=EDITOR_WIDTH, command=save)
         btn_File.grid(row=2, column=0, padx=10, pady=MAIN_PAD)
 
-        btn_Folder = tk.Button(buttons_frame, text='Close', width=EDITOR_WIDTH, command=new_win.destroy)
-        btn_Folder.grid(row=3, column=0, padx=10, pady=MAIN_PAD)
+        chdirButton = tk.Button(buttons_frame, text='ChDir', width=EDITOR_WIDTH, command=change_dir)
+        chdirButton.grid(row=3, column=0, padx=10, pady=MAIN_PAD)
+
+        btn_Close = tk.Button(buttons_frame, text='Close', width=EDITOR_WIDTH, command=new_win.destroy)
+        btn_Close.grid(row=4, column=0, padx=10, pady=MAIN_PAD)
 
         srefreshButton = tk.Checkbutton(buttons_frame, text = 'Refresh', variable = auto_refresh)
         srefreshButton.select()
-        srefreshButton.grid(row=4,column = 0, padx=10, pady=MAIN_PAD)
+        srefreshButton.grid(row=5,column = 0, padx=10, pady=MAIN_PAD)
 
         # Parent widget for the text editor
         text_Frame = tk.LabelFrame(new_win, text="Code", padx=5, pady=5)
@@ -1301,7 +1307,85 @@ def main():
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
 
+    class MenuedListbox(tk.Listbox):
+        def __init__(self, parent, *args, **kwargs):
+            tk.Listbox.__init__(self, parent, *args, **kwargs)
 
+            self.bind('a', lambda event: self.select_all())
+            self.bind('<Shift-A>', lambda event: self.deselect())
+
+            self.menu = tk.Menu(self)
+            self.menu.parent = self
+
+            self.menu.add_command(
+                label = 'add',
+                command = self.add_user_data)
+            self.menu.add_command(
+                label = 'sort',
+                command = self.sort_labels)
+            self.menu.add_command(
+                    label = 'select all',
+                    command = self.select_all)
+            self.menu.add_command(
+                    label = 'copy',
+                    command = self.copy)
+
+            self.bind('<Control-c>', lambda event: self.copy())
+
+        def add_user_data(self):
+            filenameslist = fd.askopenfilenames(filetypes = [('All files','*.*'),
+                                                          ('Text files','*.txt'),
+                                                          ('CSV files','*.csv'),
+                                                          ('FuelCell3 files','*.fcd'),
+                                                          ('NPY file','*.npy'),
+                                                          ('MLG file','*.mlg')])
+            data_folder = filenameslist[0].split('/')[-2]
+            label_list = [Entry.original_title for Entry in directory_title_Entry_list]
+            if label_list.index(data_folder) != Listbox_list.index(self):
+                print('Wrong Directory')
+                return
+            for i,full_filename in enumerate(filenameslist):
+                if full_filename in full_filenames_list: continue
+                full_filenames_list.append(full_filename)
+                if '.' == full_filename[-4]:
+                    filename = full_filename.split('/')[-1][:-4]
+                    if filename in filenames:
+                        filename = filename + '$'
+                    filenames.append(filename)
+                else:
+                    filename = full_filename.split('/')[-1]
+                    if filename in filenames:
+                        filename = filename + '$'
+                    filenames.append(filename)
+                self.insert("end",filenames[-1])
+
+        def sort_labels(self):
+            labels = list(self.get(0,'end'))
+            labels.sort()
+            self.delete(0,'end')
+            for label in labels:
+                self.insert('end',label)
+
+        def select_all(self):
+            self.select_set(0,tk.END)
+
+        def deselect(self):
+            self.selection_clear(0,'end')
+
+        def copy(self):
+            text = ''
+            for i in self.curselection():
+                filename = self.get(i)
+                text += "'" + filename + "'" + '\n'
+            root.clipboard_clear()
+            root.clipboard_append(text)
+            self.selection_clear(0,'end')
+
+        def popup_menu(self, event):
+            try:
+                self.menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                self.menu.grab_release()
 
 
 #%%--------------------------------Main Program--------------------------------
