@@ -76,6 +76,7 @@ def main():
                                                       ('FuelCell3 files','*.fcd'),
                                                       ('NPY file','*.npy'),
                                                       ('MLG file','*.mlg')])
+        if filenameslist == '': return
         data_folder = filenameslist[0].split('/')[-2]
 
         Frame_list.append(tk.Frame(main_app_files.secondFrame))
@@ -117,28 +118,28 @@ def main():
 
     def plot_curve(ax = None, image_file=False):
         """Plot the user selected data files and load data into the dict."""
-        if main_app_controls.overlay.get() and ax==None and image_file == False:                                                           #check if we want to overlay the selected data or plot it in a new graph
+        if main_app_controls.overlay.get() and ax==None and image_file == False: # create new window for line plots, overlaying all
             fig,ax = plt.subplots()
             fig_list.append(fig)
             axes_list.append(ax)
             line_plot_window = LinePlotWindow(root,fig)
             line_plot_window.title('fig ' + str(fig.number - 1))
-        k = -1                                                                      #tracks the index of file in file_names
-        for Listbox_num, Listbox_reference in enumerate(Listbox_list):
-            for data_num in range(Listbox_reference.size()):
-                k +=1
 
-                if data_num in Listbox_reference.curselection():                    #only plot user selected data
+        for Listbox_num, Listbox_reference in enumerate(Listbox_list): # loop through all filenames and find selected ones
+            for data_num in range(Listbox_reference.size()):
+                if data_num in Listbox_reference.curselection():
+                    filename = Listbox_reference.get(data_num)
+                    full_filename = full_filenames_list[filenames.index(filename)]
 
                     if image_file:
 
-                        image = Image.open(full_filenames_list[k])
-                        img_window = ImageWindow(root,image, filename=filenames[k])
-                        data[filenames[k]] = image
+                        image = Image.open(full_filename)
+                        img_window = ImageWindow(root,image, filename=filename)
+                        data[filename] = image
 
                     else:
 
-                        if not main_app_controls.overlay.get() and ax == None:                                           #if not overlaying data, make a new figure for each data file
+                        if not main_app_controls.overlay.get() and ax == None:  #if not overlaying data, make a new figure for each data file
                             fig,ax = plt.subplots()
                             fig_list.append(fig)
                             axes_list.append(ax)
@@ -149,10 +150,10 @@ def main():
                         x=int(main_app_controls.columns_to_plot.get().split(',')[0])                      #user selected data columns to plot based on their index
                         y=int(main_app_controls.columns_to_plot.get().split(',')[1])
 
-                        data_array = parse_file(filenames[k],full_filenames_list[k])
+                        data_array = parse_file(filename,full_filename)
                         ax.plot(data_array[:,x],
                                 data_array[:,y],
-                                label = filenames[k])
+                                label = filename)
                         ax.legend()
                         L = ax.get_legend()
                         L.set_draggable(True)
@@ -164,15 +165,14 @@ def main():
         """Plot a heat map from a 3 column Array of x,y,z data points."""
         string = simpledialog.askstring('title','input bulk steady state curent(s) (comma separated) for normalization\n')
         iss_list = string.split(',')
-        k = -1                                                                      #tracks the index of file in file_names
         n= -1                                                                       #tracks number of plots made
         for Listbox_num, Listbox_reference in enumerate(Listbox_list):
             for data_num in range(Listbox_reference.size()):
-                k +=1
                 if data_num in Listbox_reference.curselection():
+                    filename = Listbox_reference.get(data_num)
+                    full_filename = full_filenames_list[filenames.index(filename)]
                     n+=1
-
-                    data_array = parse_file(filenames[k],full_filenames_list[k])
+                    data_array = parse_file(filename,full_filename)
                     try:
                         iss = float(iss_list[n])
                     except:
@@ -182,42 +182,36 @@ def main():
                             iss = 1e-9
                     try:
                         X,Y,Z = data_array
-                        Z = Z / iss
                     except:
 
                         x = data_array[:,0]
                         y = data_array[:,1]
                         z = data_array[:,2]
-                        xperiod = np.argmax(x)
-                        xmax = x[xperiod]
-                        yperiod = np.argmax(y)
-                        ymax = y[yperiod]
-                        if xperiod < yperiod: #longaxis = 'y'
-                            xstep = x[1] - x[0]
-                            ystep = y[xperiod + 1] - y[0]
+                        x0 = x[0]
+                        y0 = y[0]
 
-                        if xperiod > yperiod: #longaxis = 'x'
-                            ystep = y[1] - y[0]
-                            xstep = x[yperiod + 1] - x[0]
+                        for i in range(1,x.size): # determine size of image
+                            if (x[i] == x0) and (x[i] != x[i-1]): # find index where x repeats, if it is not slow scan direction
+                                xpts = i
+                                ypts = int(x.size / xpts)
+                                break
+                            if (y[i] == y0) and (y[i] != y[i-1]):
+                                ypts = i
+                                xpts = int(x.size / ypts)
+                                break
+                        X = x.reshape((ypts,xpts))
+                        Y = y.reshape((ypts,xpts))
+                        Z = z.reshape((ypts,xpts))
+                        data[filename] = (X,Y,Z)
 
-                        xpts = int(xmax/xstep + 1)
-                        xaxis = np.linspace(x[0],xmax,xpts)
-                        ypts = int(ymax/ystep + 1)
-                        yaxis = np.linspace(y[0],ymax,ypts)
-                        X,Y = np.meshgrid(xaxis,yaxis)
-                        Z = np.empty(xpts * ypts)
-                        Z[:] = np.nan
-                        Z[:z.size] = z / iss
-                        Z = Z.reshape(ypts,xpts)
 
 
                     fig,ax = plt.subplots()
-                    extent=[X.min(),X.max(),Y.min(),Y.max()]
-                    secm_window = SecmWindow(root,fig, Z, extent=extent, filename=filenames[k], iss=iss)
+                    extent=[X[0,0], X[0,X.shape[1]-1], Y[0,0], Y[Y.shape[0]-1, 0]]
+                    secm_window = SecmWindow(root,fig, Z, extent=extent, filename=filename, iss=iss, X=X, Y=Y)
 
                     fig_list.append(fig)
                     axes_list.append(ax)
-                    data[filenames[k]] = (X,Y,Z * iss)
                     SECM_plot_ref_list.append((fig,ax,secm_window.image,secm_window.colorbar))
 
 
@@ -656,6 +650,8 @@ def main():
 
                 self.text_editor.grid(row=0, column=0,   sticky='NSEW')
 
+                self.protocol("WM_DELETE_WINDOW", self.close)
+
             def save(self):
                 text = self.text_editor.get(1.0,tk.END)
                 files = [('Python Files', '*.py'),
@@ -674,7 +670,9 @@ def main():
                 self.loc_Label.config(text='r {} c {}'.format(line, char))
 
             def close(self):
-                self.destroy
+                if self.OUTPUT_CLOSED == False:
+                    self.output_window.on_closing()
+                self.destroy()
 
             def run(self, shortcut=False):
                 i = float(self.text_editor.index(tk.INSERT))
@@ -709,7 +707,7 @@ def main():
             def on_closing(self):
                 self.parent.OUTPUT_CLOSED = True
                 sys.stdout = sys.__stdout__
-                sys.stdout = sys.__stderr__
+                sys.stderr = sys.__stderr__
                 self.destroy()
 
         class EditorAppMenubar(tk.Menu):
@@ -732,16 +730,53 @@ def main():
                     label = 'Insert',
                     menu = self.Insert_menu)
                 self.Insert_menu.add_command(
-                    label = 'Test',
-                    command = self.insert_test)
+                    label = 'text size',
+                    command = self.text_size)
+                self.Insert_menu.add_command(
+                    label = 'SECM clim',
+                    command = self.SECM_clim)
+                self.Insert_menu.add_command(
+                    label = 'edit SECM',
+                    command = self.edit_SECM)
+                self.Insert_menu.add_command(
+                    label = 'norm. PACs',
+                    command = self.norm_PACs)
 
-            def insert_test(self):
-                code_win.text_editor.insert(tk.END,"print('Test')")
+            def text_size(self):
+                code_win.text_editor.insert(tk.END,
+                                            "font_size = 14\n" +
+                                            "ax.xaxis.get_label().set_fontsize(font_size)\n" +
+                                            "ax.yaxis.get_label().set_fontsize(font_size)\n" +
+                                            "ax.tick_params(axis='both', which='major', labelsize=font_size-1)\n" +
+                                            "ax.legend(fontsize=font_size-1)")
+            def SECM_clim(self):
+                code_win.text_editor.insert(tk.END,
+                                            "low,high = 0.5,1.5\n" +
+                                            "image = ax.get_children()[0]\n" +
+                                            "image.set_clim(low,high)")
+            def edit_SECM(self):
+                code_win.text_editor.insert(tk.END,
+                                            "filename = \n" +
+                                            "x,y,z = data[filename]\n" +
+                                            "\n" +
+                                            "data[filename] = x,y,z\n")
+
+            def norm_PACs(self):
+                code_win.text_editor.insert(tk.END,
+                                            "a = 5"
+                                            "lim_currents = []\n" +
+                                            "x_offsets = []\n" +
+                                            "for line, i_lim, x_off in zip(ax.lines, lim_currents, x_offsets):\n" +
+                                            "\tline.set_xdata((line.get_xdata().max() - line.get_xdata() + x_off) / a)\n" +
+                                            "\tline.set_ydata(line.get_ydata() / i_lim)\n" +
+                                            "ax.relim()\n" +
+                                            "ax.autoscale_view()")
+
 
             def save_data(self):
                 import pickle
                 file = filedialog.asksaveasfile(mode = 'wb', filetypes = [('Pickled Files', '*.pickle')], defaultextension = [('Pickled Files', '*.pickle')])
-                pickle.dump(data,file)
+                if file: pickle.dump(data,file)
 
         class IORedirector():
             def __init__(self,text_area):
@@ -784,6 +819,10 @@ def main():
             self.File_menu.add_command(
                 label = 'remove',
                 command = self.remove_files)
+            self.File_menu.add_command(
+                label = 'open lineplot',
+                command = self.open_lineplot)
+
 
             self.Help_menu.add_command(
                 label = 'shortcuts',
@@ -845,6 +884,12 @@ def main():
             tk.Button(confirm_win, text='Yes', command=delete_files).grid(row = 1, column=0, columnspan=1, sticky="nsew", pady=5, padx=5)
             tk.Button(confirm_win, text='No', command=lambda:confirm_win.destroy()).grid(row = 1, column=1, columnspan=1, sticky="nsew", pady=5, padx=5)
 
+        def open_lineplot(self):
+            n = simpledialog.askinteger('Open lineplot', 'fig number')
+            fig = fig_list[n]
+            line_plot_window = LinePlotWindow(root,fig)
+            line_plot_window.title('fig ' + str(fig.number - 1))
+            line_plot_window.refresh()
 
         def help_shortcuts(self):
             new_win = tk.Toplevel()
@@ -921,8 +966,8 @@ def main():
             self.plot2D_Button = tk.Button(self,text='Plot SECM',command = plot_2Dmap, width=MAIN_WIDTH)
             self.plot2D_Button.grid(row = 3, column = 1,columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
-            self.code_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image_file=True))
-            self.code_Button.grid(row = 4, column = 0, columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
+            self.image_Button = tk.Button(self,text='Plot Image', command = lambda: plot_curve(image_file=True))
+            self.image_Button.grid(row = 4, column = 0, columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
 
             self.code_Button = tk.Button(self,text='Code',command = code_input, width=MAIN_WIDTH)
             self.code_Button.grid(row = 4, column = 1,columnspan = 1, sticky='nesw', padx=MAIN_PAD, pady=MAIN_PAD)
@@ -970,27 +1015,36 @@ def main():
                 self.add_command(
                     label = 'save bitmap',
                     command = self.parent.save_bitmap)
+                self.add_command(
+                    label = 'save data',
+                    command = self.parent.save_data)
 
 
-        def __init__(self, parent, fig, Z, extent=None, filename='', iss=1, *args, **kwargs):
+        def __init__(self, parent, fig, Z, extent=None, filename='', iss=1, X=None, Y=None, *args, **kwargs):
             tk.Toplevel.__init__(self, parent, *args, **kwargs)
 
             self.fig = fig
             self.fig.set_size_inches(6,5)
             self.ax = fig.axes[0]
-            self.Z = Z
+
+            self.X = X # assumed to be in μm
+            self.Y = Y # assumed to be in μm
+            self.Z = Z # assumed to be in A
+            self.iss = iss
+            self.Z_norm = self.Z / self.iss
+
             self.extent  = extent
             self.filename = filename
-            self.iss = str(iss)
 
-            self.image = self.ax.imshow(self.Z, extent=self.extent, origin='lower', interpolation='bicubic', cmap='Spectral_r')
+
+            self.image = self.ax.imshow(self.Z_norm, extent=self.extent, origin='lower', interpolation='bicubic', cmap='Spectral_r')
             self.image.original_vmin, self.image.original_vmax = self.image.get_clim()
             self.image.vmin, self.image.vmax = self.image.get_clim()
 
             self.colorbar = self.fig.colorbar(self.image, ax=self.ax, format = '%.2f')
             self.fig.set_size_inches(6,5)
 
-            self.title('fig ' + str(self.fig.number - 1) + ' | ' + self.filename + ' | ' + self.iss)
+            self.title('fig ' + str(self.fig.number - 1) + ' | ' + self.filename + ' | ' + str(self.iss))
 
             self.ax.set_xlabel('Distance / $\mu$m')
             self.ax.set_ylabel('Distance / $\mu$m')
@@ -1042,12 +1096,26 @@ def main():
 
         def save_bitmap(self):
             filename = filedialog.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
-            arr = self.Z.clip(self.image.vmin, self.image.vmax)[::-1,:] # trim data and set origin as lower left
+            arr = self.Z_norm.clip(self.image.vmin, self.image.vmax)[::-1,:] # trim data and set origin as lower left
             arr = (arr - self.image.vmin)/(self.image.vmax - self.image.vmin) # normalize 0 to 1
             img = Image.fromarray(np.uint8(cm.Spectral_r(arr)*255))
             img.save(filename)
 
+        def save_data(self):
 
+            if type(self.X) != np.ndarray or type(self.Y) != np.ndarray:
+                return
+            elif self.X.shape != self.Z.shape or self.Y.shape != self.Z.shape:
+                print('Error: X and Y must be same shape as Z')
+                return
+            else:
+                arr = np.zeros((self.Z.size,3))
+                arr[:,0] = self.X.reshape(self.Z.size)
+                arr[:,1] = self.Y.reshape(self.Z.size)
+                arr[:,2] = self.Z.reshape(self.Z.size)
+                filename = filedialog.asksaveasfilename(filetypes = [('Text', '*.txt'), ('All Files', '*.*')], defaultextension=[('Text', '*.txt'), ('All Files', '*.*')])
+                header = 'X / μm\tY / μm\tZ / A'
+                np.savetxt(filename, arr, delimiter='\t', fmt='%.3e')
 
 #%%--------------------------------build the line plot window------------------
 
@@ -1379,6 +1447,7 @@ def main():
         def refresh(self, event=None):
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
+
 
     class MenuedListbox(tk.Listbox):
         def __init__(self, parent, *args, **kwargs):
