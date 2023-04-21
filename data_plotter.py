@@ -135,7 +135,6 @@ def main():
 
                         image = Image.open(full_filename)
                         img_window = ImageWindow(root,image, filename=filename)
-                        data[filename] = image
 
                     else:
 
@@ -678,7 +677,8 @@ def main():
                 i = float(self.text_editor.index(tk.INSERT))
                 if shortcut: self.text_editor.delete("insert-1c")
                 text = self.text_editor.get(1.0, tk.END)
-                namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np, 'os':os}
+                namespace = {'data':data, 'fig_list':fig_list, 'axes_list':axes_list, 'plt':plt, 'np':np, 'os':os,
+                             'Image':Image, 'ImageWindow':ImageWindow, 'root':root}
                 if self.OUTPUT_CLOSED: self.make_output_window()
                 exec(text, namespace)
                 if self.auto_refresh.get():
@@ -741,6 +741,9 @@ def main():
                 self.Insert_menu.add_command(
                     label = 'norm. PACs',
                     command = self.norm_PACs)
+                self.Insert_menu.add_command(
+                    label = 'open image',
+                    command = self.open_image)
 
             def text_size(self):
                 code_win.text_editor.insert(tk.END,
@@ -771,6 +774,21 @@ def main():
                                             "\tline.set_ydata(line.get_ydata() / i_lim)\n" +
                                             "ax.relim()\n" +
                                             "ax.autoscale_view()")
+
+            def open_image(self):
+                code_win.text_editor.insert(tk.END,
+                                            "filename = \n" +
+                                            "ext = '.tif'\n" +
+                                            "filename += ext\n" +
+                                            "image = Image.open(filename)\n" +
+                                            "img_window = ImageWindow(root,image, filename=filename[:-4])\n"
+                                            "image_arr = np.array(image)\n" +
+                                            "image_fft = np.fft.fft2(image_arr)\n"
+                                            "img_window.fft = image_fft\n" +
+                                            "image_fft_real = np.real(np.fft.fftshift(image_fft))\n" +
+                                            "image = Image.fromarray(image_fft_real)\n" +
+                                            "img_window = ImageWindow(root,image, filename=filename[:-4] + ' fft')\n")
+
 
 
             def save_data(self):
@@ -1134,6 +1152,14 @@ def main():
                     command = self.parent.text)
 
                 self.add_command(
+                    label = 'append instance',
+                    command = self.parent.append_instance)
+
+                self.add_command(
+                    label = 'calc fft',
+                    command = self.parent.calc_fft)
+
+                self.add_command(
                     label = 'close',
                     command = self.parent.destroy)
 
@@ -1178,6 +1204,9 @@ def main():
             self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
             self.canvas.itemconfig(self.container, image=self.tkimage)
             self.canvas.config(width=self.tkimage.width(), height=self.tkimage.height())
+
+        def append_instance(self, event=None):
+            data[self.filename] = self
 
         def save(self, event=None):
             filename = filedialog.asksaveasfilename(filetypes = [('Tiff', '*.tif'), ('All Files', '*.*')], defaultextension=[('Tiff', '*.tif'), ('All Files', '*.*')])
@@ -1238,6 +1267,15 @@ def main():
 
             self.tkimage = ImageTk.PhotoImage(self.image)
             self.update_image()
+
+        def calc_fft(self, event=None):
+            image_arr = np.array(self.image)
+            image_fft = np.fft.fft2(image_arr)
+            image_fft_real = np.real(np.fft.fftshift(image_fft))
+            image = Image.fromarray(image_fft_real)
+            img_window = ImageWindow(root,image, filename=self.filename + ' fft')
+            img_window.fft = image_fft
+
 
         def measure(self, event=None):
             WIDTH = 10
@@ -1388,7 +1426,6 @@ def main():
             text_button.grid(row=3, column=0, columnspan=1)
             close_button = tk.Button(win, text='Close', command=close_window, width=10)
             close_button.grid(row=3, column=1, columnspan=1)
-
 
     class LinePlotWindow(tk.Toplevel):
         class AppRclickMenu(tk.Menu):
