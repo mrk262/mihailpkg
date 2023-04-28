@@ -3,6 +3,7 @@ import numpy as np
 #import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import fft
+from math import ceil, floor
 import os
 import pickle
 import mihailpkg.data_plotter as dp
@@ -213,21 +214,21 @@ def dict_value_from_num(dict,n):
     return dict[list(dict.keys())[n]]
 
 def resize_array(arr,newsize):
-    arr1 = np.copy(arr)
-    arr2 = np.zeros(newsize)
-    i_prev = 0
-    j_prev = 0
-    for i in range(1, arr1.size):
-        j = i * arr2.size / arr1.size
-        m2 = (arr1[i] - arr1[i_prev]) / (j - j_prev)
-        for k in range((round(j) - round(j_prev))):
-            j_int = round(j_prev + k)
-            arr2[j_int] = arr1[i] + (j_int - j) * m2
-        i_prev = i
-        j_prev = j
-    for n in range(j_int,arr2.size): #extrapolate any pts leftover
-        arr2[n] = arr1[i] + (n - j) * m2
-    return arr2
+    def arr_continuous(x):
+        if x.is_integer():
+            return arr[int(x)]
+        else:
+            x2, x1 = ceil(x), floor(x)
+            y2, y1 = arr[x2], arr[x1]
+            m = (y2 - y1) / (x2 - x1)
+            y = m*(x - x1) + y1
+            return y
+
+    arr_resized = np.zeros(newsize)
+    for i in range(newsize):
+        x = i*(arr.size - 1)/(newsize - 1)
+        arr_resized[i] = arr_continuous(x)
+    return arr_resized
 
 def text_figure(desc, fig=None, height=0.2, fontsize=10):
     if fig and height < 1:

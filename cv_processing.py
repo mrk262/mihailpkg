@@ -66,7 +66,8 @@ del fft
 del dp
 del fd
 del tk
-
+del ceil
+del floor
 
 # depreciated 2023 01 30
 

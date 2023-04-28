@@ -1272,7 +1272,8 @@ def main():
             image_arr = np.array(self.image)
             image_fft = np.fft.fft2(image_arr)
             image_fft_real = np.real(np.fft.fftshift(image_fft))
-            image = Image.fromarray(image_fft_real)
+            size = max(self.tkimage.width(), self.tkimage.height())
+            image = Image.fromarray(image_fft_real).resize((size,size))
             img_window = ImageWindow(root,image, filename=self.filename + ' fft')
             img_window.fft = image_fft
 
