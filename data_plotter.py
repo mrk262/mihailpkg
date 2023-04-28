@@ -1170,26 +1170,28 @@ def main():
             self.original_image = self.image.copy()
             self.tkimage = ImageTk.PhotoImage(self.original_image)
 
-            self.resizable(False,False)
+            #self.resizable(False,False)
             self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
             self.title("{}x{}\t".format(self.tkimage.width(), self.tkimage.height()) + self.filename)
 
             self.canvas = tk.Canvas(self, width=self.tkimage.width(), height=self.tkimage.height())
-            self.container = self.canvas.create_image(0, 0, anchor='nw', image=self.tkimage)
-            self.canvas.pack()
+            self.image_container = self.canvas.create_image(0, 0, anchor='nw', image=self.tkimage)
+            self.canvas.pack(anchor='nw')
 
             self.magnification = 1
 
             self.bind('<Button-3>', lambda x: self.popup_menu(event=x))
             self.bind('<Right>', lambda x: self.open_next_previous(event=x))
             self.bind('<Left>', lambda x: self.open_next_previous(event=x, previous=True))
+            self.bind('<MouseWheel>', lambda x: self.scale_mousewheel(event=x, magnification=(4/3)))
             self.bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
             self.bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
             self.bind('<m>', lambda x: self.measure(event=x))
             self.bind('<Control-s>', lambda x: self.save(event=x))
             self.bind('<t>', lambda x: self.text(event=x))
-
-
+            self.bind('<Double-Button-1>', lambda x: self.return_to_origin(event=x))
+            self.bind('<ButtonPress-2>', self.move_from)
+            self.bind('<B2-Motion>', self.move_to)
 
             self.app_rclick_menu = ImageWindow.AppRclickMenu(self)
 
@@ -1199,10 +1201,27 @@ def main():
             finally:
                 self.app_rclick_menu.grab_release()
 
+        def move_from(self, event):
+            ''' Remember previous coordinates for scrolling with the mouse '''
+            self.x, self.y = event.x, event.y
+
+        def move_to(self, event):
+            ''' Drag (move) canvas to the new position '''
+            dx = event.x - self.x
+            dy = event.y - self.y
+            self.canvas.move(self.image_container, dx, dy)
+            self.x, self.y = event.x, event.y
+
+
+        def return_to_origin(self, event):
+            self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
+            x,y = self.canvas.coords(self.image_container)
+            self.canvas.move(self.image_container, -x, -y)
+
         def update_image(self):
             self.tkimage = ImageTk.PhotoImage(self.image)
-            self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
-            self.canvas.itemconfig(self.container, image=self.tkimage)
+            #self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
+            self.canvas.itemconfig(self.image_container, image=self.tkimage)
             self.canvas.config(width=self.tkimage.width(), height=self.tkimage.height())
 
         def append_instance(self, event=None):
@@ -1268,6 +1287,13 @@ def main():
             self.tkimage = ImageTk.PhotoImage(self.image)
             self.update_image()
 
+        def scale_mousewheel(self, event = None, magnification = 1):
+            if event.delta > 1:
+                self.scale(magnification = 4/3)
+            if event.delta < 1:
+                self.scale(magnification = 3/4)
+
+
         def calc_fft(self, event=None):
             image_arr = np.array(self.image)
             image_fft = np.fft.fft2(image_arr)
@@ -1281,7 +1307,8 @@ def main():
         def measure(self, event=None):
             WIDTH = 10
             def return_pointer_coord(event=None):
-                x, y = event.x, event.y
+                x0, y0 = self.canvas.coords(self.image_container)
+                x, y = event.x - x0, event.y - y0
                 if not pt1.active:
                     pt1.active = True
                     pt1.config(text='{}, {}'.format(x, y))
@@ -1317,6 +1344,7 @@ def main():
                 self.bind('<Up>', lambda x: self.scale(event=x, magnification=(4/3)))
                 self.bind('<Down>', lambda x: self.scale(event=x, magnification=(3/4)))
                 self.bind('<m>', lambda x: self.measure(event=x))
+                self.bind('<MouseWheel>', lambda x: self.scale_mousewheel(event=x, magnification=(4/3)))
                 self.image = self.original_image.copy()
                 self.update_image()
 
@@ -1348,6 +1376,7 @@ def main():
             self.unbind('<Up>')
             self.unbind('<Down>')
             self.unbind('<m>')
+            self.unbind('<MouseWheel>')
 
             tk.Label(win, text='pt1:', width=WIDTH).grid(row=0, column=0)
             pt1 = tk.Label(win, text='', width=WIDTH)
@@ -1369,7 +1398,8 @@ def main():
         def text(self, event=None):
             WIDTH = 20
             def return_pointer_coord(event=None):
-                x, y = event.x, event.y
+                x0, y0 = self.canvas.coords(self.image_container)
+                x, y = event.x - x0, event.y - y0
                 try:
                     self.previous_image = self.image.copy()
                     draw = ImageDraw.Draw(self.image)

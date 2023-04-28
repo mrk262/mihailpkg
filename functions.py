@@ -10,6 +10,16 @@ import mihailpkg.data_plotter as dp
 import tkinter.filedialog as fd
 import tkinter as tk
 
+def fit_poly(x, y, deg, stats=False):
+    A = np.zeros((x.size,deg+1))
+    for col in range(deg+1):
+        A[:,col] = x**(deg - col)
+    x, res, rank, s = np.linalg.lstsq(A, y,rcond=None)
+    if not stats:
+        return x
+    if stats:
+        return x, res
+
 def delim_spectrum(filename, skiplines = 0):
     with open(filename, 'r') as file:
         all_lines = file.readlines()
