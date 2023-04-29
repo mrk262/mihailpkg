@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from matplotlib import cm
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageTk, ImageOps
 import tkinter as tk
 from tkinter import scrolledtext
 from tkinter import filedialog
@@ -1154,11 +1154,15 @@ def main():
                 self.add_command(
                     label = 'append instance',
                     command = self.parent.append_instance)
-
                 self.add_command(
                     label = 'calc fft',
                     command = self.parent.calc_fft)
-
+                self.add_command(
+                    label = 'histogram',
+                    command = self.parent.histogram)
+                self.add_command(
+                    label = 'Auto B/C',
+                    command = self.parent.auto_BC)
                 self.add_command(
                     label = 'close',
                     command = self.parent.destroy)
@@ -1192,6 +1196,8 @@ def main():
             self.bind('<Double-Button-1>', lambda x: self.return_to_origin(event=x))
             self.bind('<ButtonPress-2>', self.move_from)
             self.bind('<B2-Motion>', self.move_to)
+            self.bind('<h>', self.histogram)
+            self.bind('<f>', self.calc_fft)
 
             self.app_rclick_menu = ImageWindow.AppRclickMenu(self)
 
@@ -1295,13 +1301,63 @@ def main():
 
 
         def calc_fft(self, event=None):
-            image_arr = np.array(self.image)
+
+            image_arr = np.float32(self.image) # uint to float
+
+            if len(image_arr.shape) == 3: # if image format is RGB or RGBA
+                image_arr = 0.2989*image_arr[:,:,0] + 0.5870*image_arr[:,:,1] + 0.1140*image_arr[:,:,2]
+
             image_fft = np.fft.fft2(image_arr)
-            image_fft_real = np.real(np.fft.fftshift(image_fft))
-            size = max(self.tkimage.width(), self.tkimage.height())
+            image_fft_real = np.log(np.abs(np.fft.fftshift(image_fft)))
+            i_min,i_max = np.min(image_fft_real), np.max(image_fft_real)
+            image_fft_real = (image_fft_real - i_min) / (i_max - i_min) * 255 # equalize histogram and convert to uint8
+            image_fft_real = np.uint8(image_fft_real)
+
+            size = max(image_arr.shape)
             image = Image.fromarray(image_fft_real).resize((size,size))
+
             img_window = ImageWindow(root,image, filename=self.filename + ' fft')
             img_window.fft = image_fft
+
+        def histogram(self, event=None):
+            image_arr = np.float32(self.image) # uint to float
+
+            if len(image_arr.shape) == 3: # if image format is RGB or RGBA
+                fig, ax = plt.subplots(ncols=3, figsize=(9,3))
+                line_plot_window = LinePlotWindow(root,fig)
+                line_plot_window.title(self.filename)
+                colors = ['r','g','b']
+
+                for i in range(3):
+                    nrow,ncol = image_arr[:,:,i].shape
+                    arr = image_arr[:,:,i].reshape(nrow*ncol)
+                    ax[i].hist(arr, bins=np.linspace(0,255,256), color=colors[i])
+                    ax[i].axes.get_yaxis().set_visible(False)
+                    ax[i].spines['right'].set_visible(False);ax[i].spines['left'].set_visible(False);ax[i].spines['top'].set_visible(False)
+                    ax[i].tick_params(axis='both', which='major', labelsize=8)
+                    ax[i].set_xlim(0,255)
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+
+
+            else:
+                nrow,ncol = image_arr.shape
+                arr = image_arr.reshape(nrow*ncol)
+                fig,ax = plt.subplots(figsize=(3,3))
+                line_plot_window = LinePlotWindow(root,fig)
+                line_plot_window.title(self.filename)
+                ax.hist(arr, bins=np.linspace(0,255,256))
+                ax.axes.get_yaxis().set_visible(False)
+                ax.spines['right'].set_visible(False);ax.spines['left'].set_visible(False);ax.spines['top'].set_visible(False)
+                ax.tick_params(axis='both', which='major', labelsize=8)
+                ax.set_xlim(0,255)
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+
+        def auto_BC(self, event=None):
+            image = self.image.convert('RGB')
+            image = ImageOps.equalize(image)
+            img_window = ImageWindow(root,image, filename=self.filename + ' equalized')
 
 
         def measure(self, event=None):
