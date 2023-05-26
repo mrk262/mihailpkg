@@ -61,13 +61,14 @@ del np
 del os
 del pickle
 del plt
-#del pd
+del sparse
 del fft
 del dp
 del fd
 del tk
 del ceil
 del floor
+del struct
 
 # depreciated 2023 01 30
 

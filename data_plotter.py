@@ -42,6 +42,7 @@ def main():
     """Load files into data dict and visualize the data with user interaction."""
     root = tk.Tk()                                                                #root widget
     root.title('Plot this shit')
+    root.iconbitmap(r'metanoia.ico')
     plt.style.use('mystyle')                                                        #style preferences for plotting
     float_formatter = "{:.2f}".format
     np.set_printoptions(formatter={'float_kind':float_formatter})
@@ -1229,6 +1230,7 @@ def main():
             #self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
             self.canvas.itemconfig(self.image_container, image=self.tkimage)
             self.canvas.config(width=self.tkimage.width(), height=self.tkimage.height())
+            self.geometry("{}x{}".format(self.tkimage.width(), self.tkimage.height()))
 
         def append_instance(self, event=None):
             data[self.filename] = self

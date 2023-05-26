@@ -2,13 +2,87 @@
 import numpy as np
 #import pandas as pd
 import matplotlib.pyplot as plt
-from scipy import fft
+from scipy import fft, sparse
 from math import ceil, floor
 import os
 import pickle
 import mihailpkg.data_plotter as dp
 import tkinter.filedialog as fd
 import tkinter as tk
+import struct
+
+def get_shortcut_absolute_path(path):
+    target = ''
+
+    with open(path, 'rb') as stream:
+        content = stream.read()
+        # skip first 20 bytes (HeaderSize and LinkCLSID)
+        # read the LinkFlags structure (4 bytes)
+        lflags = struct.unpack('I', content[0x14:0x18])[0]
+        position = 0x18
+        # if the HasLinkTargetIDList bit is set then skip the stored IDList
+        # structure and header
+        if (lflags & 0x01) == 1:
+            position = struct.unpack('H', content[0x4C:0x4E])[0] + 0x4E
+        last_pos = position
+        position += 0x04
+        # get how long the file information is (LinkInfoSize)
+        length = struct.unpack('I', content[last_pos:position])[0]
+        # skip 12 bytes (LinkInfoHeaderSize, LinkInfoFlags, and VolumeIDOffset)
+        position += 0x0C
+        # go to the LocalBasePath position
+        lbpos = struct.unpack('I', content[position:position+0x04])[0]
+        position = last_pos + lbpos
+        # read the string at the given position of the determined length
+        size= (length + last_pos) - position - 0x02
+        temp = struct.unpack('c' * size, content[position:position+size])
+        target = ''.join([chr(ord(a)) for a in temp])
+    return target
+
+def baseline_als(y, lam=1e7, p=0.01, niter=10):
+  L = len(y)
+  D = sparse.csc_matrix(np.diff(np.eye(L), 2))
+  w = np.ones(L)
+  for i in range(niter):
+    W = sparse.spdiags(w, 0, L, L)
+    Z = W + lam * D.dot(D.transpose())
+    z = sparse.linalg.spsolve(Z, w*y)
+    w = p * (y > z) + (1-p) * (y < z)
+  return z
+
+def redistribute(x,y,x_new):
+    def interpolate(x0):
+        i = np.searchsorted(x, x0, side="left")
+
+        if i == 0:
+            return y[i]
+        if i == y.size:
+            return y[i-1]
+        if x[i] == x0:
+            return y[i]
+
+        if x[i] > x0:
+            x1,x2 = x[i-1], x[i]
+            y1,y2 = y[i-1], y[i]
+            y_new = (y2-y1)/(x2-x1) * (x0-x1) + y1
+            return y_new
+
+    y_new = np.zeros(y.size)
+    for i in range(y.size):
+        y_new[i] = interpolate(x_new[i])
+
+    return y_new
+
+
+def radial_profile(data, center):
+    y, x = np.indices((data.shape))
+    r = np.sqrt((x - center[0])**2 + (y - center[1])**2)
+    r = r.astype(int)
+
+    tbin = np.bincount(r.ravel(), data.ravel())
+    nr = np.bincount(r.ravel())
+    radialprofile = tbin / nr
+    return radialprofile
 
 def fit_poly(x, y, deg, stats=False):
     A = np.zeros((x.size,deg+1))
