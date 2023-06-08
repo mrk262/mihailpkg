@@ -1553,7 +1553,7 @@ def main():
             self.canvas = FigureCanvasTkAgg(fig, master=self)  # A tk.DrawingArea.
             self.canvas.draw()
             self.canvas.get_tk_widget().pack(side="bottom",fill='both',expand=True)
-            self.canvas.get_tk_widget().bind('<Button-3>', self.popup_menu)
+            self.canvas.get_tk_widget().bind('<Double-Button-1>', self.popup_menu)
             self.canvas.get_tk_widget().bind('l', lambda x: legend_ON(ax = self.ax, event=x))
             self.canvas.get_tk_widget().bind('<Shift-L>', lambda x: legend_OFF(ax = self.ax, event=x))
             self.canvas.get_tk_widget().bind('r', self.refresh)
