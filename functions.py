@@ -40,15 +40,35 @@ def get_shortcut_absolute_path(path):
     return target
 
 def baseline_als(y, lam=1e7, p=0.01, niter=10):
-  L = len(y)
-  D = sparse.csc_matrix(np.diff(np.eye(L), 2))
-  w = np.ones(L)
-  for i in range(niter):
-    W = sparse.spdiags(w, 0, L, L)
-    Z = W + lam * D.dot(D.transpose())
-    z = sparse.linalg.spsolve(Z, w*y)
-    w = p * (y > z) + (1-p) * (y < z)
-  return z
+    '''
+
+
+    Parameters
+    ----------
+    y : ndarray
+        Spectrum.
+    lam : float, optional
+        DESCRIPTION. The default is 1e7.
+    p : float, optional
+        DESCRIPTION. The default is 0.01.
+    niter : int, optional
+        DESCRIPTION. The default is 10.
+
+    Returns
+    -------
+    z : ndarray
+        Background.
+
+    '''
+    L = len(y)
+    D = sparse.csc_matrix(np.diff(np.eye(L), 2))
+    w = np.ones(L)
+    for i in range(niter):
+      W = sparse.spdiags(w, 0, L, L)
+      Z = W + lam * D.dot(D.transpose())
+      z = sparse.linalg.spsolve(Z, w*y)
+      w = p * (y > z) + (1-p) * (y < z)
+    return z
 
 def redistribute(x,y,x_new):
     def interpolate(x0):
@@ -700,7 +720,7 @@ def del_AfterMath_files():
         if file_parts[-1] != 'Current vs Potential.csv':
             os.remove(file)
             continue
-        os.rename(file,file_parts[1])
+        os.rename(file,file_parts[-4])
 
 def time_from_potential(potential, scanrate):
 
