@@ -13,6 +13,8 @@ class EQCM:
     ----------
     data_array : str OR ndarray
         Data filename or array.
+    analog : bool, optional
+        Sets default column positions. The default is False.
     t_col : int, optional
         Time [s] column number in data array. The default is 5.
     f_col : int, optional
@@ -42,6 +44,7 @@ class EQCM:
     '''
     def __init__(self,
                  data_array,
+                 analog = False,
                  t_col = 5,
                  f_col = 2,
                  R_col = 1,
@@ -56,6 +59,13 @@ class EQCM:
                          'C_f':42, 'delimiter':'\t', 'qcm_area':0.4,}
         kwargs = { **defaultKwargs, **kwargs }
 
+        if analog:
+            t_col, E_col, i_col, f_col, R_col = 0, 1, 2, 3, 4
+            with open(data_array, 'r') as file:
+                labels = file.readline()
+                labels = file.readline().split('\t')
+                units = [label.split(' / ')[1] for label in labels]
+                kwargs['t_units'], kwargs['E_units'], kwargs['i_units'], kwargs['f_units'], kwargs['R_units'] = units[0], units[1], units[2], units[3], units[4]
 
         if type(data_array) == str:
             data_array = parse_file(data_array, delim=kwargs['delimiter'])
@@ -218,12 +228,14 @@ class EQCM:
         if rezero:
             self.rezero()
 
-    def plot(self,i_s=0,i_f='end', xaxis='time'):
+    def plot(self, variable=None, i_s=0,i_f='end', xaxis='time'):
         '''
         Plot frequency and resistance vs time or potential
 
         Parameters
         ----------
+        variable : str, optional
+            Plot selected variable. The default is none.
         i_s : int, optional
             Start index. The default is 0.
         i_f : int, optional
@@ -239,28 +251,47 @@ class EQCM:
             DESCRIPTION.
 
         '''
-        FIG,AX = plt.subplots(nrows=2, ncols=1, sharex=True,figsize = (5,8),tight_layout=False)
-        FIG.subplots_adjust(hspace=0)
-        text_figure(self.label, fig=FIG, height=1)
+
+        if variable:
+            fig, ax = plt.subplots()
+        else:
+            fig,ax = plt.subplots(nrows=2, ncols=1, sharex=True,figsize = (5,8),tight_layout=False)
+            fig.subplots_adjust(hspace=0)
+            text_figure(self.label, fig=fig, height=1)
 
         if i_f == 'end':
             i_f = self.size
 
         if xaxis == 'time':
-            AX[0].plot(self.time[i_s:i_f],self.freq[i_s:i_f])
-            AX[1].plot(self.time[i_s:i_f],self.res[i_s:i_f])
-            AX[0].set_ylabel(self.freq_label)
-            AX[1].set_ylabel(self.res_label)
-            AX[1].set_xlabel(self.time_label)
+            if variable:
+                data = getattr(self, variable)
+                ax.plot(self.time[i_s:i_f],data[i_s:i_f])
+                ax.set_ylabel(getattr(self, variable + '_label'))
+                ax.set_xlabel(self.time_label)
+
+            else:
+                ax[0].plot(self.time[i_s:i_f],self.freq[i_s:i_f])
+                ax[1].plot(self.time[i_s:i_f],self.res[i_s:i_f])
+                ax[0].set_ylabel(self.freq_label)
+                ax[1].set_ylabel(self.res_label)
+                ax[1].set_xlabel(self.time_label)
 
         elif xaxis == 'potential':
-            AX[0].plot(self.potential[i_s:i_f],self.freq[i_s:i_f])
-            AX[1].plot(self.potential[i_s:i_f],self.res[i_s:i_f])
-            AX[0].set_ylabel(self.freq_label)
-            AX[1].set_ylabel(self.res_label)
-            AX[1].set_xlabel(self.potential_label)
+            if variable:
+                data = getattr(self, variable)
+                ax.plot(self.potential[i_s:i_f],data[i_s:i_f])
+                ax.set_ylabel(getattr(self, variable + '_label'))
+                ax.set_xlabel(self.potential_label)
 
-        return FIG,AX
+
+            else:
+                ax[0].plot(self.potential[i_s:i_f],self.freq[i_s:i_f])
+                ax[1].plot(self.potential[i_s:i_f],self.res[i_s:i_f])
+                ax[0].set_ylabel(self.freq_label)
+                ax[1].set_ylabel(self.res_label)
+                ax[1].set_xlabel(self.potential_label)
+
+        return fig,ax
 
     def mass_to_charge_cont(self, npts_to_avg = 50):
         '''
