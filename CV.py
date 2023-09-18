@@ -1,11 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+import tkinter as tk
 from .functions import average, savitzky_golay, antideriv, parse_file, time_from_potential
 
 class CV:
     """
     Create a CV from a data array.
+
+    default kwargs: t_col=0, t_units='s',
+                    E_col=1, E_units='V vs Li/Li⁺',
+                    i_col=2, i_units='A',
+                    Q_units='mC/cm²', delimiter='\\t'
+
     """
 
     def __init__(self,
@@ -84,6 +91,28 @@ class CV:
         string3 = '\tTime: {:<15s} Charge: {:<15s}'.format(s1,s2)
 
         return string1 + string2 + string3
+
+    def gui(self):
+
+        def update_instance():
+            self.label = labelEntry.get()
+            root.title(self.label + ' : ' + str(id(self)))
+
+        root = tk.Tk()
+        root.title(self.label + ' : ' + str(id(self)))
+        #root.geometry('200x100')
+        frame = tk.Frame(root)
+        frame.pack()
+
+        tk.Button(master=frame, text='Update', padx=20, command=update_instance).grid(row=0,column=1,columnspan = 2)
+
+        labelLabel = tk.Label(master=frame, text='label: ', padx=20)
+        labelLabel.grid(row=1,column=1,columnspan = 1)
+        labelEntry = tk.Entry(master=frame)
+        labelEntry.insert(0,self.label)
+        labelEntry.grid(row=1,column=2,columnspan = 1)
+
+
 
     @property
     def size(self):
