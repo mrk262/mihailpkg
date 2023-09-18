@@ -21,8 +21,7 @@ import sys, traceback
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
 
-warnings.filterwarnings("ignore", message="This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.")
-# warnings.filterwarnings("ignore", message="Starting a Matplotlib GUI outside of the main thread will likely fail.")
+warnings.filterwarnings("ignore")
 
 '''
 Store a file's numeric data as an Array in a dict (data) with the filename as the key.
@@ -583,6 +582,11 @@ def main():
         tk.Button(win, text="Save to file", command=save2, padx=2, pady=2).grid(row=0, column=1, columnspan=1, sticky='nesw', padx=5, pady=5)
         tk.Button(win, text="Cancel", command=win.destroy, padx=2, pady=2).grid(row=0, column=2, columnspan=1, sticky='nesw', padx=5, pady=5)
 
+    def clear_axes(ax):
+        ax.clear()
+        ax.get_figure().canvas.draw()
+        ax.get_figure().canvas.flush_events()
+
 #%%--------------------------------secm plot popup menu commands---------------
 
 
@@ -745,6 +749,12 @@ def main():
                 self.Insert_menu.add_command(
                     label = 'open image',
                     command = self.open_image)
+                self.Insert_menu.add_command(
+                    label = 'bgrd-sub pxrd',
+                    command = self.bgrd_sub_pxrds)
+                self.Insert_menu.add_command(
+                    label = 'norm pxrd',
+                    command = self.normalize_pxrds)
 
             def text_size(self):
                 code_win.text_editor.insert(tk.END,
@@ -789,6 +799,53 @@ def main():
                                             "image_fft_real = np.real(np.fft.fftshift(image_fft))\n" +
                                             "image = Image.fromarray(image_fft_real)\n" +
                                             "img_window = ImageWindow(root,image, filename=filename[:-4] + ' fft')\n")
+
+            def bgrd_sub_pxrds(self):
+                code_win.text_editor.insert(tk.END,
+                                            "from mihailpkg import cv_processing as cp\n" +
+                                            "def odd(x):\n" +
+                                            	"\treturn round(x/2) * 2 - 1\n" +
+                                            "ax = axes_list[1]\n" +
+                                            "ax.clear()\n" +
+                                            "\n" +
+                                            "lam = 1e8\n" +
+                                            "p = 0.01\n" +
+                                            "\n" +
+                                            "data = axes_list[0].lines\n" +
+                                            "for i,line in enumerate(data):\n" +
+                                            	"\tlabel = line.get_label()\n" +
+                                            	"\tx,y = line.get_data()\n" +
+                                            	"\tx,y = x.copy(), y.copy()\n" +
+                                            	"\tbkrd = cp.baseline_als(y, lam=lam, p=p)\n" +
+                                            	"\ty -= bkrd\n" +
+                                            	"\ty = cp.savitzky_golay(y,odd(y.size/200),10)\n" +
+                                            	"\tax.plot(x, y, label=label)\n" +
+                                            "ax.get_yaxis().set_visible(False)\n" +
+                                            "#ax.text(0.5, 0.5, 'lam: {:.2e} p: {:.2f}'.format(lam,p), transform=ax.transAxes)\n" +
+                                            "ax.legend()\n")
+
+            def normalize_pxrds(self):
+                code_win.text_editor.insert(tk.END,
+                                            "from mihailpkg import cv_processing as cp\n" +
+                                            "def odd(x):\n" +
+                                            	"\treturn round(x/2) * 2 - 1\n" +
+                                            "ax = axes_list[2]\n" +
+                                            "ax.clear()\n" +
+                                            "\n" +
+                                            "lam = 1e8\n" +
+                                            "p = 0.01\n" +
+                                            "\n" +
+                                            "data = axes_list[1].lines\n" +
+                                            "for i,line in enumerate(data):\n" +
+                                            	"\tlabel = line.get_label()\n" +
+                                            	"\tx,y = line.get_data()\n" +
+                                            	"\tx,y = x.copy(), y.copy()\n" +
+                                            	"\ty /= y.max()\n" +
+                                            	"\ty -= i\n" +
+                                            	"\tax.plot(x, y, label=label)\n" +
+                                            "ax.get_yaxis().set_visible(False)\n" +
+                                            "#ax.text(0.5, 0.5, 'lam: {:.2e} p: {:.2f}'.format(lam,p), transform=ax.transAxes)\n" +
+                                            "ax.legend()\n")
 
 
 
@@ -1540,6 +1597,9 @@ def main():
                 self.add_command(
                     label = 'add lines',
                     command = lambda: plot_curve(ax=ax))
+                self.add_command(
+                    label = 'clear plot',
+                    command = lambda: clear_axes(ax))
 
 
         def __init__(self, parent, fig, *args, **kwargs):
