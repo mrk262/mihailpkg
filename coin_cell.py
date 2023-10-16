@@ -7,24 +7,24 @@ Created on Mon Oct  3 13:20:33 2022
 
 import numpy as np
 
-def get_cycling_data(filename):
+def get_cycling_data(filename, delim='\t'):
     '''
     Load relavent galvanostatic cycling data from excel sheet into an array and save the array.
 
     Parameters
     ----------
     filename : str
-        File name of raw tab delimited ASCII data.
+        File name of 'Records' sheet from battery cycler.
 
     Returns
     -------
     cycling_data : ndarray
-        Data cols are time, voltage, cycleID, and current.
+        Data cols: | time | voltage | cycleID | current |
 
     '''
 
 
-    delim = '\t'
+    delim = delim
     time_col = 5 # hr:min:s
     voltage_col = 7
     cycleID_col = 1

@@ -5,7 +5,6 @@ Created on Sun Apr 11 19:27:44 2021
 @author: Mihail
 """
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
@@ -27,8 +26,9 @@ warnings.filterwarnings("ignore")
 Store a file's numeric data as an Array in a dict (data) with the filename as the key.
 Store a file's column labels as a list of str in a separate dict (label) with the same filename as key.
 '''
-data = {'label':{}}
+data = {'label':{}, 'metadata':{}}
 label = data['label']
+metadata = data['metadata']
 
 def main():
     ENTRY_FONT = ('Times 14')
@@ -216,11 +216,17 @@ def main():
 
     def parse_file(filename,full_filename):
         """Parse the data file for numeric data and append data array to the dictionary."""
-        try: #if the file has been loaded previously, get it from the data dictionary
+        try: # if the file has been loaded previously, get it from the data dictionary
             data_array = data[filename]
             return data_array
-        except KeyError:    #parse the file for the data, removing header and identifying data labels
+        except KeyError: pass
 
+        try: # if the file is a binary file saved by numpy
+            data_array = np.load(full_filename, allow_pickle=True)
+            return data_array
+        except: pass
+
+        try:
             with open(full_filename, encoding='utf8') as file:
                 text_file = file.readlines()
 
@@ -235,7 +241,7 @@ def main():
             for i in range(1,100):
                 '''find the number of data columns by checking rows for numerical data,
                 starting from the end of the file and going up.
-                The footer is likely absent or small, errors are less likely then
+                The footer is likely absent or small, errors are less likely than
                 looping through the header first'''
                 try:
                     last_row = text_file[-1*i].strip().split(delim)
@@ -248,16 +254,20 @@ def main():
                 except:
                     continue
 
+            reading_data = False
             for i,row in enumerate(text_file):
+                if row[0] == '#': continue
+                if not reading_data: metadata_row = i
                 columns_list = row.strip().split(delim)
                 for j,element in enumerate(columns_list):
                     if len(element) == 0: continue
-                    if element[0] == '#': continue                  #comment character
                     try:                                            #if the row contains the correct number of elements and these are
                         numeric_element = float(element)            #all numeric type, it is the data we want to plot and store.
+                        reading_data = True
                         columns_list[j] = numeric_element
                         if j == num_col - 1:
                             numeric_data.append(columns_list)
+
                     except:
                         if len(columns_list) == num_col and j == 0: #if the (text) row contains the same number of elements as a data row,
                             label[filename] = columns_list          #it must be a label describing the data
@@ -266,7 +276,16 @@ def main():
             data[filename] = data_array                         #add the data to the dictionary
             if filename not in label:
                 label[filename] = list(range(num_col))
+            if filename not in metadata:
+                metedata_text = ''
+                for row in text_file[:metadata_row]: metedata_text += row
+                metadata[filename] = metedata_text
+
             return data_array
+        except:
+            print('-'*20)
+            print('Failed to load file')
+            print('-'*20)
 
 
     def legend_OFF(event = None, ax=None):
