@@ -246,7 +246,8 @@ class CV:
         ax.set_xlabel(self.potential_label)
         ax.set_ylabel(self.current_label)
         ax.legend()
-        fig.text(0.1,1.0,'Area = {:.0f} $\mu$C/cm$^2$'.format(peak_area))
+        text = ax.text(-0.1,1.05,'Area = {:.0f} $\mu$C/cm$^2$'.format(peak_area), transform=ax.transAxes)
+        text.set_in_layout(True)
         return peak_area, fig
 
 

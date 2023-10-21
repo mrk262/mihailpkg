@@ -118,7 +118,13 @@ def main():
 
     def plot_curve(ax = None, image_file=False):
         """Plot the user selected data files and load data into the dict."""
-        if main_app_controls.overlay.get() and ax==None and image_file == False: # create new window for line plots, overlaying all
+
+        overlay = main_app_controls.overlay.get()
+
+        if ax==None and image_file == False: new_fig = True
+        else: new_fig = False
+
+        if new_fig and overlay: # create new window for line plots, overlaying all
             fig,ax = plt.subplots()
             fig_list.append(fig)
             axes_list.append(ax)
@@ -132,13 +138,11 @@ def main():
                     full_filename = full_filenames_list[filenames.index(filename)]
 
                     if image_file:
-
                         image = Image.open(full_filename)
                         img_window = ImageWindow(root,image, filename=filename)
 
                     else:
-
-                        if not main_app_controls.overlay.get() and ax == None:  #if not overlaying data, make a new figure for each data file
+                        if new_fig and (not overlay):  #if not overlaying data, make a new figure for each data file
                             fig,ax = plt.subplots()
                             fig_list.append(fig)
                             axes_list.append(ax)
