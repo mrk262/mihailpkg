@@ -923,6 +923,7 @@ def main():
 
         code_win = CodeWindow(root)
         menubar = EditorAppMenubar(code_win)
+        return code_win
 
     def replot_secm(fig):
         pass
@@ -1710,6 +1711,9 @@ def main():
             self.menu.add_command(
                     label = 'copy',
                     command = self.copy)
+            self.menu.add_command(
+                    label = 'metadata',
+                    command = self.metadata)
 
             self.bind('<Control-c>', lambda event: self.copy())
 
@@ -1765,6 +1769,19 @@ def main():
             root.clipboard_clear()
             root.clipboard_append(text)
             self.selection_clear(0,'end')
+
+        def metadata(self):
+            filename = self.get(self.curselection()[0])
+            try:
+                text = data['metadata'][filename]
+                window = tk.Toplevel(root)
+                window.title(filename)
+                text_output = tk.scrolledtext.ScrolledText(window)
+                text_output.tag_config('warning', background="yellow", foreground="red")
+                text_output.pack(fill='both', expand=True)
+                text_output.insert(tk.INSERT, text)
+
+            except KeyError: pass
 
         def popup_menu(self, event):
             try:
