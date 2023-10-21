@@ -6,6 +6,7 @@ Created on Sun Apr 11 19:27:44 2021
 """
 
 import numpy as np
+import pickle
 import matplotlib.pyplot as plt
 from matplotlib.text import Annotation
 from matplotlib import cm
@@ -99,17 +100,41 @@ def main():
 
         Listbox_list[-1].bind('<Button-3>',lambda event: event.widget.popup_menu(event=event))
 
+        new_filenameslist = []
+        for i,full_filename in enumerate(filenameslist):
+            if full_filename[-7:] == '.pickle':
+                with open(full_filename,'rb') as file:
+                    data_dict = pickle.load(file)
+                    for key in data_dict:
+                        if (key != 'metadata') and (key != 'label'):
+                            while True:
+                                if key in data:
+                                    key+='@'
+                                else: break
+                            data[key] = data_dict[key.strip('@')]
+                            label[key] = data_dict['label'][key.strip('@')]
+                            metadata[key] = data_dict['metadata'][key.strip('@')]
+                            new_filenameslist.append(data_folder + '/' + key)
+
+
+        if new_filenameslist != []:
+            filenameslist = new_filenameslist
+
         for i,full_filename in enumerate(filenameslist):
             full_filenames_list.append(full_filename)
             if '.' == full_filename[-4]:
                 filename = full_filename.split('/')[-1][:-4]
-                if filename in filenames:
-                    filename = filename + '$'
+                while True:
+                    if filename in filenames:
+                        filename = filename + '@'
+                    else: break
                 filenames.append(filename)
             else:
                 filename = full_filename.split('/')[-1]
-                if filename in filenames:
-                    filename = filename + '$'
+                while True:
+                    if filename in filenames:
+                        filename = filename + '@'
+                    else: break
                 filenames.append(filename)
             Listbox_list[-1].insert("end",filenames[-1])
         Scrollbar_list[-1].config(command = Listbox_list[-1].yview)
@@ -157,6 +182,9 @@ def main():
                         ax.plot(data_array[:,x],
                                 data_array[:,y],
                                 label = filename)
+                        if new_fig:
+                            ax.set_xlabel(label[filename][0])
+                            ax.set_ylabel(label[filename][1])
                         ax.legend()
                         L = ax.get_legend()
                         L.set_draggable(True)
@@ -949,7 +977,7 @@ def main():
 
                     for m,file in enumerate(full_filenames_list):
                         file_structure = file.split('/')
-                        if (selected_filename.strip('$') == file_structure[-1][:-4]) and (
+                        if (selected_filename.strip('@') == file_structure[-1][:-4]) and (
                                 directory_title_Entry_list[n].original_title == file_structure[-2]):
 
                             directory = ''
@@ -1700,13 +1728,17 @@ def main():
                 full_filenames_list.append(full_filename)
                 if '.' == full_filename[-4]:
                     filename = full_filename.split('/')[-1][:-4]
-                    if filename in filenames:
-                        filename = filename + '$'
+                    while True:
+                        if filename in filenames:
+                            filename = filename + '@'
+                        else: break
                     filenames.append(filename)
                 else:
                     filename = full_filename.split('/')[-1]
-                    if filename in filenames:
-                        filename = filename + '$'
+                    while True:
+                        if filename in filenames:
+                            filename = filename + '@'
+                        else: break
                     filenames.append(filename)
                 self.insert("end",filenames[-1])
 
@@ -1727,7 +1759,7 @@ def main():
             text = ''
             for i in self.curselection():
                 filename = self.get(i)
-                text += "'" + filename + "'" + '\n'
+                text += "'" + filename + "'"
             root.clipboard_clear()
             root.clipboard_append(text)
             self.selection_clear(0,'end')

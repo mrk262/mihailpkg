@@ -368,13 +368,16 @@ def load_and_plot_files():
     return data
 
 def convert_all_txt_files(delimiter = '\t'):
-    data = {'label':{}}
+    data = {'label':{}, 'metadata':{}}
     label = data['label']
+    metadata = data['metadata']
+
     def parse_file(filename):
         """Parse the data file for numeric data and append data array to the dictionary."""
 
         with open(filename) as file:
             text_file = file.readlines()
+        filename = filename[:-4]
         numeric_data = []
         delim = delimiter
 
@@ -390,22 +393,30 @@ def convert_all_txt_files(delimiter = '\t'):
             except:
                 continue
 
+        reading_data = False
         for i,row in enumerate(text_file):
+            if row[0] == '#': continue
+            if not reading_data: metadata_row = i
             columns_list = row.strip().split(delim)
             for j,element in enumerate(columns_list):
                 try:                                            #if the row contains the correct number of elements and these are
                     numeric_element = float(element)            #all numeric type, it is the data we want to plot and store.
                     columns_list[j] = numeric_element
+                    reading_data = True
                     if j == num_col - 1:
                         numeric_data.append(columns_list)
                 except:
-                    if len(columns_list) == num_col and j == 0: #if the (text) row contains the same number of elements as a data row,
+                    if len(columns_list) == num_col and j == 0:
                         label[filename] = columns_list          #it must be a label describing the data
                     continue
         data_array = np.array(numeric_data)
-        data[filename[:-4]] = data_array                         #add the data to the dictionary
+        data[filename] = data_array                         #add the data to the dictionary
         if filename not in label:
             label[filename] = list(range(num_col))
+        if filename not in metadata:
+            metedata_text = ''
+            for row in text_file[:metadata_row]: metedata_text += row
+            metadata[filename] = metedata_text
 
     for filename in os.listdir():
         if filename[-3:] == 'txt':
