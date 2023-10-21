@@ -112,8 +112,10 @@ def main():
                                     key+='@'
                                 else: break
                             data[key] = data_dict[key.strip('@')]
-                            label[key] = data_dict['label'][key.strip('@')]
-                            metadata[key] = data_dict['metadata'][key.strip('@')]
+                            try: label[key] = data_dict['label'][key.strip('@')]
+                            except KeyError: pass
+                            try: metadata[key] = data_dict['metadata'][key.strip('@')]
+                            except KeyError: pass
                             new_filenameslist.append(data_folder + '/' + key)
 
 
