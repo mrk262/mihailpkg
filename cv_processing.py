@@ -9,52 +9,31 @@ from .CV import CV
 from .EQCM import EQCM
 from .axis_labels import axis_labels
 
-def CV_from_numbers(file_dictionary,n,t_col = False,E_col=0,i_col=1):
+def CV_from_numbers(file_dictionary,n,**CVkwargs):
     """Create a CV object from an entry in a file dictionary."""
-
-    def CV_from_n(file_dictionary,n,t_col = False,E_col=0,i_col=1):
+    def CV_from_n(file_dictionary,n,CVkwargs=CVkwargs):
         keys = [*file_dictionary]
-        if t_col:
-            time = file_dictionary[keys[n]][:,t_col]
-            potential = file_dictionary[keys[n]][:,E_col]
-            current = file_dictionary[keys[n]][:,i_col]
-            cv = CV(np.stack((time,potential,current), axis = 1),
-                    label = keys[n])
-            return cv
-        else:
-            potential = file_dictionary[keys[n]][:,E_col]
-            current = file_dictionary[keys[n]][:,i_col]
-            cv = CV(np.stack((potential,current),axis = 1),
-                    label = keys[n])
-            return cv
+        arr = file_dictionary[keys[n]]
+        cv = CV(arr, **CVkwargs)
+        return cv
 
     if type(n) == int:
-        cv = CV_from_n(file_dictionary, n,
-                        t_col = t_col,
-                        E_col = E_col,
-                        i_col = i_col)
+        cv = CV_from_n(file_dictionary, n)
         return cv
 
     if type(n) == str:
         cv_list = []
         for i in range(len(file_dictionary)):
-            cv = CV_from_n(file_dictionary, i,
-                            t_col = t_col,
-                            E_col = E_col,
-                            i_col = i_col)
+            cv = CV_from_n(file_dictionary, i)
             cv_list.append(cv)
         return cv_list
 
     else:
         cv_list = []
         for i in n:
-            cv = CV_from_n(file_dictionary, i,
-                            t_col = t_col,
-                            E_col = E_col,
-                            i_col = i_col)
+            cv = CV_from_n(file_dictionary, i)
             cv_list.append(cv)
         return cv_list
-
 
 # Clean up namespace
 del np

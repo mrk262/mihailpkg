@@ -15,6 +15,7 @@ import tkinter as tk
 from tkinter import scrolledtext
 from tkinter import filedialog
 from tkinter import simpledialog
+from mihailpkg import cv_processing as cp
 import warnings
 import os
 import sys, traceback
@@ -181,17 +182,20 @@ def main():
                         y=int(main_app_controls.columns_to_plot.get().split(',')[1])
 
                         data_array = parse_file(filename,full_filename)
-                        ax.plot(data_array[:,x],
-                                data_array[:,y],
-                                label = filename)
-                        if new_fig:
-                            ax.set_xlabel(label[filename][0])
-                            ax.set_ylabel(label[filename][1])
-                        ax.legend()
-                        L = ax.get_legend()
-                        L.set_draggable(True)
-                        ax.get_figure().canvas.draw()
-                        ax.get_figure().canvas.flush_events()
+                        if type(data_array) == str:
+                            cp.data_to_fig(data_array, fig=fig, ax=ax)
+                        else:
+                            ax.plot(data_array[:,x],
+                                    data_array[:,y],
+                                    label = filename)
+                            if new_fig:
+                                ax.set_xlabel(label[filename][x])
+                                ax.set_ylabel(label[filename][y])
+                            ax.legend()
+                            L = ax.get_legend()
+                            L.set_draggable(True)
+                            ax.get_figure().canvas.draw()
+                            ax.get_figure().canvas.flush_events()
 
 
     def plot_2Dmap():
@@ -254,6 +258,9 @@ def main():
             data_array = data[filename]
             return data_array
         except KeyError: pass
+
+        if full_filename[-4:] == '.mlg':
+            return full_filename
 
         try: # if the file is a binary file saved by numpy
             data_array = np.load(full_filename, allow_pickle=True)
@@ -621,8 +628,10 @@ def main():
             y_label = ax.get_ylabel()
             file.write(x_label + '\t' + y_label + '\n')
             for line in ax.lines:
-                label = line.get_label()
-                file.write(label + '\n')
+                try:
+                    label = line.get_label()
+                    file.write(label + '\n')
+                except: pass
                 xdata,ydata = line.get_data()
                 for i in range(xdata.size):
                     file.write(str(xdata[i]) + '\t' + str(ydata[i]) + '\n')
@@ -808,6 +817,10 @@ def main():
                 self.Insert_menu.add_command(
                     label = 'norm pxrd',
                     command = self.normalize_pxrds)
+                self.Insert_menu.add_command(
+                    label = 'copy data',
+                    command = self.copy_data)
+
 
             def text_size(self):
                 code_win.text_editor.insert(tk.END,
@@ -899,6 +912,14 @@ def main():
                                             "ax.get_yaxis().set_visible(False)\n" +
                                             "#ax.text(0.5, 0.5, 'lam: {:.2e} p: {:.2f}'.format(lam,p), transform=ax.transAxes)\n" +
                                             "ax.legend()\n")
+            def copy_data(self):
+                code_win.text_editor.insert(tk.END,
+                                            "from mihailpkg import cv_processing as cp\n" +
+                                            "ax = axes_list[1]\n" +
+                                            "ax.clear()\n" +
+                                            "line = axes_list[0].lines[0]\n" +
+                                            "x,y = line.get_xdata().copy(), line.get_ydata().copy()\n" +
+                                            "ax.plot(x,y)\n")
 
 
 
@@ -1677,6 +1698,16 @@ def main():
             self.toolbarFrame = tk.Frame(master=self)
             self.toolbarFrame.pack(side="top",fill='x',expand=False)
             self.toolbar = NavigationToolbar2Tk(self.canvas, self.toolbarFrame)
+
+            self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        def on_closing(self):
+
+            ### clean up references
+            # fig_list[:] = [x for x in fig_list if not id(self.fig) == id(x)]
+            # axes_list[:] = [x for x in axes_list if not id(self.ax) == id(x)]
+            # plt.close(self.fig)
+            self.destroy()
 
         def popup_menu(self, event=None):
             try:

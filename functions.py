@@ -683,12 +683,12 @@ def fig_to_data(fig,filename):
 
     fig.savefig(filename + '.png')
 
-def data_to_fig(filename):
+def data_to_fig(filename, fig=None, ax=None):
     """Open a multiple line graph file as a figure."""
     with open(filename,'r') as file:
         textfile = file.readlines()
-
-    fig,ax = plt.subplots()
+    if fig==None or ax==None:
+        fig,ax = plt.subplots()
     ax.set_xlabel(textfile[0].split('\t')[0].strip())
     ax.set_ylabel(textfile[0].split('\t')[1].strip())
     label = textfile[1].strip()
@@ -839,8 +839,8 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     from math import factorial
 
     try:
-        window_size = np.abs(np.int(window_size))
-        order = np.abs(np.int(order))
+        window_size = np.abs(int(window_size))
+        order = np.abs(int(order))
     except ValueError:
         raise ValueError("window_size and order have to be of type int")
     if window_size % 2 != 1 or window_size < 1:
