@@ -1,2 +1,2 @@
 # mihailpkg
- my shit
+ Collection of functions, routines, and libraries that I have written during my PhD
