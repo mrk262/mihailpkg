@@ -262,10 +262,9 @@ def main():
         if full_filename[-4:] == '.mlg':
             return full_filename
 
-        try: # if the file is a binary file saved by numpy
+        if full_filename[-6:] == '.numpy': # if the file is a binary file saved by numpy
             data_array = np.load(full_filename, allow_pickle=True)
             return data_array
-        except: pass
 
         try:
             with open(full_filename, encoding='utf8') as file:
@@ -278,7 +277,6 @@ def main():
 
             numeric_data = []
             delim = main_app_controls.delimiter.get()
-
             for i in range(1,100):
                 '''find the number of data columns by checking rows for numerical data,
                 starting from the end of the file and going up.
@@ -294,7 +292,6 @@ def main():
                     break
                 except:
                     continue
-
             reading_data = False
             for i,row in enumerate(text_file):
                 if row[0] == '#': continue
@@ -321,8 +318,8 @@ def main():
                 metedata_text = ''
                 for row in text_file[:metadata_row]: metedata_text += row
                 metadata[filename] = metedata_text
-
             return data_array
+
         except:
             print('-'*20)
             print('Failed to load file')
@@ -818,6 +815,9 @@ def main():
                     label = 'norm pxrd',
                     command = self.normalize_pxrds)
                 self.Insert_menu.add_command(
+                    label = 'digital filter',
+                    command = self.digital_filter)
+                self.Insert_menu.add_command(
                     label = 'copy data',
                     command = self.copy_data)
 
@@ -912,6 +912,36 @@ def main():
                                             "ax.get_yaxis().set_visible(False)\n" +
                                             "#ax.text(0.5, 0.5, 'lam: {:.2e} p: {:.2f}'.format(lam,p), transform=ax.transAxes)\n" +
                                             "ax.legend()\n")
+            def digital_filter(self):
+                code_win.text_editor.insert(tk.END,
+                                            "from scipy import fft\n" +
+                                            "from scipy import signal\n" +
+                                            "import numpy as np\n" +
+                                            "\n" +
+                                            "def FFT(y):\n" +
+                                            	"\tn=y.size\n" +
+                                            	"\ty_fft = np.log(np.abs(fft.fftshift(fft.fft(y))))\n" +
+                                            	"\tf = fft.fftshift(fft.fftfreq(y.size, d=1/n))\n" +
+                                            	"\treturn f[n//2:], y_fft[n//2:]\n" +
+                                            "\n" +
+                                            "ax1 = axes_list[0];ax2 = axes_list[2]\n" +
+                                            "ax1.clear();ax2.clear()\n" +
+
+                                            "line = axes_list[1].lines[0]\n" +
+                                            "x,y = line.get_xdata().copy(), line.get_ydata().copy()\n" +
+                                            "f, y_fft = FFT(y)\n" +
+                                            "ax1.plot(y);ax2.plot(f,y_fft)\n" +
+                                            "N=100\n" +
+                                            "y_svg = signal.savgol_filter(y, y.size//N, 7)\n" +
+                                            "sos = signal.butter(3, 100, btype='lowpass', output='sos', fs=y.size)\n" +
+                                            "\n" +
+                                            "y_bw = signal.sosfilt(sos, y)\n" +
+                                            "f, y_fft = FFT(y_bw)\n" +
+                                            "f, y_svgfft = FFT(y_svg)\n" +
+                                            "ax1.plot(y_svg);ax2.plot(f,y_svgfft)\n" +
+                                            "ax1.plot(np.arange(y.size)-0.3*y.size/N,y_bw);ax2.plot(f,y_fft)\n")
+
+
             def copy_data(self):
                 code_win.text_editor.insert(tk.END,
                                             "from mihailpkg import cv_processing as cp\n" +

@@ -42,7 +42,7 @@ del pickle
 del plt
 del sparse
 del fft
-del dp
+#del dp
 del fd
 del tk
 del ceil

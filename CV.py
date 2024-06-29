@@ -215,7 +215,7 @@ class CV:
         self.current = current
         self.potential = self.potential[:current.size]
 
-    def peak_integration(self, lower_index, upper_index, **plot_kwargs):
+    def peak_integration(self, lower_index, upper_index, ax=None, **plot_kwargs):
         '''
         Calculate the charge under a peak defined by indicies with linear background
 
@@ -236,8 +236,8 @@ class CV:
             Plot of integrated peak and background for integration.
 
         '''
-
-        fig,ax = plt.subplots() #plot current
+        if ax == None:
+            fig,ax = plt.subplots() #plot current
         potential, current, charge = self.potential[lower_index:upper_index], self.current[lower_index:upper_index], self.charge[lower_index:upper_index] - self.charge[lower_index]
         background = 0.5 * (current[0] + current[-1]) * (potential[-1] - potential[0]) / self.scanrate
         peak_area = charge[-1] - background
@@ -248,7 +248,10 @@ class CV:
         ax.legend()
         text = ax.text(-0.1,1.05,'Area = {:.0f} $\mu$C/cm$^2$'.format(peak_area), transform=ax.transAxes)
         text.set_in_layout(True)
-        return peak_area, fig
+        if ax == None:
+            return peak_area, fig
+        else:
+            return peak_area, ax
 
 
     def plot(self,ax = False,i_s = 0,i_f = 'end',cycle = 0, warn = True,
@@ -549,3 +552,16 @@ class CV:
                 self.charge_units = 'C/cm$^2$'
             else:
                 print('Error!')
+
+    def save(self, filename):
+        if type(self.time) == type(None):
+            time = np.zeros(self.size)
+            time_units = 'None'
+
+        else:
+            time = self.time
+            time_units = self.time_units
+
+        units = '{}\t{}\t{}'.format(time_units, self.potential_units, self.current_units)
+        arr = np.vstack((time, self.potential, self.current)).T
+        np.savetxt(filename, arr, fmt='%.7e', delimiter='\t', header=units)

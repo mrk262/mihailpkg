@@ -598,3 +598,20 @@ class EQCM:
         self.freq -= self.freq[0]
         try: self.charge -= self.charge[0]
         except TypeError: pass
+
+    def save(self, filename):
+        if type(self.potential) == type(None) or type(self.current) == type(None):
+            potential = np.zeros(self.size)
+            potential_units = 'None'
+            current = np.zeros(self.size)
+            current_units = 'None'
+
+        else:
+            potential = self.potential
+            potential_units = self.potential_units
+            current = self.current
+            current_units = self.current_units
+
+        header = 'Scan rate: None, current converter: None\nTime / {}\tPotential / {}\tCurrent / {}\tFrequency / {}\tResistance / {}'.format(self.time_units, potential_units, current_units, self.freq_units, self.res_units)
+        arr = np.vstack((self.time, potential, current, self.freq, self.res)).T
+        np.savetxt(filename, arr, fmt='%.7e', delimiter='\t', header=header)

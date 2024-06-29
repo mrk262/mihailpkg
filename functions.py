@@ -6,7 +6,7 @@ from scipy import fft, sparse
 from math import ceil, floor
 import os
 import pickle
-import mihailpkg.data_plotter as dp
+#import mihailpkg.data_plotter as dp
 import tkinter.filedialog as fd
 import tkinter as tk
 import struct
@@ -71,6 +71,24 @@ def baseline_als(y, lam=1e7, p=0.01, niter=10):
     return z
 
 def redistribute(x,y,x_new):
+    '''
+
+
+    Parameters
+    ----------
+    x : ndarray
+        DESCRIPTION.
+    y : ndarray
+        DESCRIPTION.
+    x_new : ndarray
+        DESCRIPTION.
+
+    Returns
+    -------
+    ndarray
+        y_new.
+
+    '''
     def interpolate(x0):
         i = np.searchsorted(x, x0, side="left")
 
@@ -86,6 +104,14 @@ def redistribute(x,y,x_new):
             y1,y2 = y[i-1], y[i]
             y_new = (y2-y1)/(x2-x1) * (x0-x1) + y1
             return y_new
+
+    # Ensure that the array is sorted in ascending order
+    if np.all(x[:-1] <= x[1:]): #ascending order
+        pass
+    elif np.all(x[:-1] >= x[1:]): #descending order
+        x, x_new = -x, -x_new
+    else:
+        print('array is not sorted')
 
     y_new = np.zeros(y.size)
     for i in range(y.size):
@@ -318,6 +344,7 @@ def dict_value_from_num(dict,n):
     return dict[list(dict.keys())[n]]
 
 def resize_array(arr,newsize):
+    if arr.size == newsize: return arr
     def arr_continuous(x):
         if x.is_integer():
             return arr[int(x)]
