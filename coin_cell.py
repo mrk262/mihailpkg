@@ -116,7 +116,7 @@ def get_dchg_profile(data_arr, cycle=1, tol=1e-5, capacity=False):
     Returns
     -------
     ndarray
-        Current effeciency of each cycle.
+        discharge_profile, charge_profile
 
     '''
     data_arr = data_arr.copy()
@@ -135,8 +135,8 @@ def get_dchg_profile(data_arr, cycle=1, tol=1e-5, capacity=False):
         return np.array(switching_indicies)
 
     switching_indicies = get_switching_indicies(data_arr)
-    charge = slice(switching_indicies[2*cycle-1], switching_indicies[2*cycle]-1)
-    discharge = slice(switching_indicies[2*cycle-2], switching_indicies[2*cycle-1]-1)
+    charge = slice(switching_indicies[2*cycle-1], switching_indicies[2*cycle])
+    discharge = slice(switching_indicies[2*cycle-2], switching_indicies[2*cycle-1])
 
     charge_profile = data_arr[charge,:2]
     discharge_profile = data_arr[discharge,:2]
