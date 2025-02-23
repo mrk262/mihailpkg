@@ -786,33 +786,128 @@ def time_from_potential(potential, scanrate):
     time /= scanrate
     return time
 
-def potential_from_time_and_CV_limits(time_arr,upper_lim,lower_lim,scan_rt,init_dir,
-                                      start_E):
-    """Create an Array of potential points from an Array of time points and parameters for a CV experiment."""
-    potential = np.zeros(time_arr.size)
-    potential[0] = start_E
-    direction = init_dir
-    if start_E > upper_lim:
-        first_cyc_index_below_lim = (((start_E - upper_lim) / scan_rt)
-                                           / (time_arr[1] - time_arr[0]))
-    elif start_E < lower_lim:
-        first_cyc_index_below_lim = (((lower_lim - start_E) / scan_rt)
-                                           / (time_arr[1] - time_arr[0]))
-    else:
-        first_cyc_index_below_lim = 0
-    for i in range(1,time_arr.size):
-        dt = time_arr[i] - time_arr[i-1]
-        if direction == 'down':
-            v =  potential[i-1] - dt * scan_rt
-        if direction == 'up':
-            v =  potential[i-1] + dt * scan_rt
-        if v < lower_lim and i > first_cyc_index_below_lim:
-            direction = 'up'
-        if v > upper_lim and i > first_cyc_index_below_lim:
-            direction = 'down'
+### THIS FUNCTION HAS BEEN UPDATED BELOW
+# def potential_from_time_and_CV_limits(time_arr,upper_lim,lower_lim,scan_rt,init_dir,
+#                                       start_E):
+#     """Create an Array of potential points from an Array of time points and parameters for a CV experiment."""
+#     potential = np.zeros(time_arr.size)
+#     potential[0] = start_E
+#     direction = init_dir
+#     if start_E > upper_lim:
+#         first_cyc_index_below_lim = (((start_E - upper_lim) / scan_rt)
+#                                            / (time_arr[1] - time_arr[0]))
+#     elif start_E < lower_lim:
+#         first_cyc_index_below_lim = (((lower_lim - start_E) / scan_rt)
+#                                            / (time_arr[1] - time_arr[0]))
+#     else:
+#         first_cyc_index_below_lim = 0
+#     for i in range(1,time_arr.size):
+#         dt = time_arr[i] - time_arr[i-1]
+#         if direction == 'down':
+#             v =  potential[i-1] - dt * scan_rt
+#         if direction == 'up':
+#             v =  potential[i-1] + dt * scan_rt
+#         if v < lower_lim and i > first_cyc_index_below_lim:
+#             direction = 'up'
+#         if v > upper_lim and i > first_cyc_index_below_lim:
+#             direction = 'down'
 
-        potential[i] = v
-    return potential
+#         potential[i] = v
+#     return potential
+
+def potential_from_time_and_CV_limits(time_arr,upper_lim,lower_lim,scan_rt,init_dir,start_E):
+    '''
+    Compute the potential waveform as a fucntion of time.
+
+    Parameters
+    ----------
+    time_arr : ndarray, shape (N)
+        An array of time points.
+    upper_lim : float
+        upper potential limit, Eh.
+    lower_lim : float
+        lower potential limit, El.
+    scan_rt : float
+        scan rate.
+    init_dir : str
+        "up" or "down" for anodic or cathodic scan directions, respectively.
+    start_E : float
+        Initail potential.
+
+    Returns
+    -------
+    E : ndarray, shape (N)
+        The potential waveform.
+
+    '''
+    E = np.zeros(time_arr.size)
+    t_half_cycle = (upper_lim - lower_lim) / scan_rt
+
+    for i in range(time_arr.size):
+        t = time_arr[i]
+
+        # CASE 1: Ei = Eh
+        if start_E == upper_lim:
+            if (t//t_half_cycle)%2 == 0: #even number of half cycles
+                E[i] = upper_lim - (t % t_half_cycle) * scan_rt
+            if (t//t_half_cycle)%2 == 1: #odd number of half cycles
+                E[i] = lower_lim + (t % t_half_cycle) * scan_rt
+
+        # CASE 2: Ei = El
+        elif start_E == lower_lim:
+            if (t//t_half_cycle)%2 == 1: #even number of half cycles
+                E[i] = upper_lim - (t % t_half_cycle) * scan_rt
+            if (t//t_half_cycle)%2 == 0: #odd number of half cycles
+                E[i] = lower_lim + (t % t_half_cycle) * scan_rt
+
+        # CASE 3: Ei > Eh
+        elif start_E > upper_lim:
+            t_to_Eh = (start_E - upper_lim) / scan_rt
+            if t < t_to_Eh:
+                E[i] = start_E - t* scan_rt
+            else: # CASE 1
+                t -= t_to_Eh
+                if (t//t_half_cycle)%2 == 0: #even number of half cycles
+                    E[i] = upper_lim - (t % t_half_cycle) * scan_rt
+                if (t//t_half_cycle)%2 == 1: #odd number of half cycles
+                    E[i] = lower_lim + (t % t_half_cycle) * scan_rt
+
+        # CASE 4: Ei < El
+        elif start_E < lower_lim:
+            t_to_El = (lower_lim - start_E) / scan_rt
+            if t < t_to_El:
+                E[i] = start_E + t* scan_rt
+            else: # CASE 2
+                t -= t_to_El
+                if (t//t_half_cycle)%2 == 1: #even number of half cycles
+                    E[i] = upper_lim - (t % t_half_cycle) * scan_rt
+                if (t//t_half_cycle)%2 == 0: #odd number of half cycles
+                    E[i] = lower_lim + (t % t_half_cycle) * scan_rt
+
+        # CASE 5: Ei < Eh and initail scan diraction is down
+        elif (start_E < upper_lim) and (init_dir == 'down'):
+            t_to_El = (start_E - lower_lim) / scan_rt
+            if t < t_to_El:
+                E[i] = start_E - t* scan_rt
+            else: # CASE 2
+                t -= t_to_El
+                if (t//t_half_cycle)%2 == 1: #even number of half cycles
+                    E[i] = upper_lim - (t % t_half_cycle) * scan_rt
+                if (t//t_half_cycle)%2 == 0: #odd number of half cycles
+                    E[i] = lower_lim + (t % t_half_cycle) * scan_rt
+
+        # CASE 6: Ei < Eh and initail scan diraction is down
+        elif (start_E > lower_lim) and (init_dir == 'up'):
+            t_to_Eh = (upper_lim - start_E) / scan_rt
+            if t < t_to_Eh:
+                E[i] = start_E + t* scan_rt
+            else: # CASE 1
+                t -= t_to_Eh
+                if (t//t_half_cycle)%2 == 0: #even number of half cycles
+                    E[i] = upper_lim - (t % t_half_cycle) * scan_rt
+                if (t//t_half_cycle)%2 == 1: #odd number of half cycles
+                    E[i] = lower_lim + (t % t_half_cycle) * scan_rt
+    return E
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
@@ -877,7 +972,7 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     order_range = range(order+1)
     half_window = (window_size -1) // 2
     # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    b = np.asmatrix([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
     m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
     # pad the signal at the extremes with
     # values taken from the signal itself
@@ -910,7 +1005,7 @@ def linearize_region(arr,i_start,i_end):
                                         i_end - i_start - 1,
                                         i_end - i_start - 1) * m + arr[i_start]
 
-def vertical_line_at_x(x,ax):
+def vertical_line_at_x(x,ax,**kwarg):
     lim = ax.get_ylim()
-    ax.plot([x,x],lim,'r--',linewidth = 1)
+    ax.plot([x,x],lim,'r--',**kwarg)
     ax.set_ylim(lim)
